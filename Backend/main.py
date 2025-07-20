@@ -9,6 +9,9 @@ from ultralytics import YOLO
 import asyncio
 import logging
 import time
+import json
+from fastapi import Request
+from math import radians, cos, sin, asin, sqrt
 logging.getLogger("ultralytics").setLevel(logging.WARNING)
 
 # Initialising Apps
@@ -44,6 +47,44 @@ LANE_VIDEO_MAP = {
     'west': '4.mp4',
 }
 
+TRAFFIC_LIGHT_COORDS = (28.7198611, 77.2621111)
+AMBULANCE_OVERRIDE_DURATION = 30  # seconds
+ambulance_override = {
+    'active': False,
+    'direction': None,
+    'end_time': 0
+}
+
+# Haversine formula to calculate distance between two lat/long points in meters
+def haversine(lat1, lon1, lat2, lon2):
+    R = 6371000  # Radius of earth in meters
+    dlat = radians(lat2 - lat1)
+    dlon = radians(lon2 - lon1)
+    a = sin(dlat/2)**2 + cos(radians(lat1)) * cos(radians(lat2)) * sin(dlon/2)**2
+    c = 2 * asin(sqrt(a))
+    return R * c
+
+@app.post('/ambulance_override')
+async def ambulance_override_post(request: Request):
+    data = await request.json()
+    lat = float(data.get('lat'))
+    lon = float(data.get('long'))
+    direction = data.get('direction')
+    if direction not in ['north', 'south', 'east', 'west']:
+        print(f"[AMBULANCE] Invalid direction: {direction}")
+        return {"status": "error", "message": "Invalid direction"}
+    dist = haversine(lat, lon, TRAFFIC_LIGHT_COORDS[0], TRAFFIC_LIGHT_COORDS[1])
+    print(f"[AMBULANCE] Received: lat={lat}, lon={lon}, direction={direction}, distance={dist:.2f}m")
+    if dist <= 5:
+        ambulance_override['active'] = True
+        ambulance_override['direction'] = direction
+        ambulance_override['end_time'] = time.time() + AMBULANCE_OVERRIDE_DURATION
+        print(f"[AMBULANCE] Ambulance within 5m, OVERRIDING {direction} to GREEN for {AMBULANCE_OVERRIDE_DURATION}s")
+        return {"status": "ok", "override": True}
+    else:
+        print(f"[AMBULANCE] Ambulance not close enough for override.")
+        return {"status": "ok", "override": False}
+
 @app.get('/')
 def slash():
     return {
@@ -76,13 +117,56 @@ async def websocket_detect(websocket: WebSocket):
             nonlocal manual_change_request
             while not stop_event.is_set():
                 data = await websocket.receive_text()
-                import json
                 msg = json.loads(data)
                 if msg.get('type') == 'manual_change':
                     print(f"[RECEIVED] Manual change request for lane: {msg.get('lane')}")
                     manual_change_request = msg.get('lane')
         recv_task = asyncio.create_task(receive_manual_change())
         while not stop_event.is_set():
+            # Ambulance override check
+            now = time.time()
+            if ambulance_override['active']:
+                if now < ambulance_override['end_time']:
+                    # Force the override direction to green, others to red
+                    for lane in LANE_VIDEO_MAP: # Use LANE_VIDEO_MAP to get all lanes
+                        lights[lane] = 'green' if lane == ambulance_override['direction'] else 'red'
+                    current_green = ambulance_override['direction']
+                    last_green_time = now  # keep resetting so normal logic doesn't interfere
+                    print(f"[AMBULANCE] OVERRIDE ACTIVE: {ambulance_override['direction']} GREEN, others RED")
+                    # Re-send current status to ensure clients are aware of override
+                    await websocket.send_json({
+                        'frame': None, # No new frame for override
+                        'counts': {},
+                        'total': 0,
+                        'video': None,
+                        'lights': lights,
+                        'current_green': current_green,
+                        'last_green_time': last_green_time,
+                        'vehicle_counts': vehicle_counts,
+                        'override_active': True,
+                        'override_direction': ambulance_override['direction']
+                    })
+                    await asyncio.sleep(0.5) # Small delay to allow override to take effect
+                    continue  # skip normal logic
+                else:
+                    print(f"[AMBULANCE] OVERRIDE ENDED, resuming normal operation.")
+                    ambulance_override['active'] = False
+                    ambulance_override['direction'] = None
+                    ambulance_override['end_time'] = 0
+                    # Re-send current status to ensure clients are aware of override end
+                    await websocket.send_json({
+                        'frame': None,
+                        'counts': {},
+                        'total': 0,
+                        'video': None,
+                        'lights': lights,
+                        'current_green': current_green,
+                        'last_green_time': last_green_time,
+                        'vehicle_counts': vehicle_counts,
+                        'override_active': False,
+                        'override_direction': None
+                    })
+
             # 1. Read one frame per lane and count vehicles
             for lane, cap in caps.items():
                 ret, frame = cap.read()
