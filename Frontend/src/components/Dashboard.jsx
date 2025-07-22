@@ -114,17 +114,7 @@ function LaneCard({
             Total Vehicles: <span className="font-bold" style={{ color: '#ec4899' }}>{data?.total || 0}</span>
           </div>
           <div className="font-semibold text-center" style={{ color: darkMode ? '#fff' : '#222' }}>
-            Signal: <span className={`font-bold capitalize ${colorClass(light)}`}>{light}</span>
-          </div>
-          <div className="font-semibold text-center" style={{ color: darkMode ? '#fff' : '#222' }}>
-            Current Green: <span className={`font-mono ${isCurrentGreen ? 'text-green-400 font-bold' : 'text-gray-400'}`}>{isCurrentGreen ? 'Yes' : currentGreen || '-'}</span>
-          </div>
-          <div className="font-semibold text-center" style={{ color: darkMode ? '#fff' : '#222' }}>
             Last Green Time: <span className="font-mono" style={{ color: isCurrentGreen ? '#facc15' : '#aaa' }}>{isCurrentGreen ? lastGreenTime : '-'}</span>
-          </div>
-          <div className="font-semibold text-center" style={{ color: darkMode ? '#fff' : '#222' }}>
-            All Vehicle Counts:
-            <span className="block font-mono" style={{ color: '#38bdf8', wordBreak: 'break-all' }}>{vehicleCounts ? JSON.stringify(vehicleCounts) : '-'}</span>
           </div>
         </div>
       )}
