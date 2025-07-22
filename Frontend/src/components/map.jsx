@@ -1,8 +1,6 @@
 import React, { useRef, useState, useEffect } from 'react';
 import { GoogleMap, Marker, Polyline, useJsApiLoader } from '@react-google-maps/api';
 import ambulanceImg from '../assets/ambulance.png';
-import trafficLightRed from '../assets/traffic_light_red.png';
-import trafficLightGreen from '../assets/traffic_light_green.png';
 
 const containerStyle = {
   width: '100vw',
@@ -30,20 +28,16 @@ const ambulanceIcon = {
   anchor: { x: 18, y: 24 },
   labelOrigin: { x: 18, y: 12 },
 };
-// Helper to generate a realistic traffic light SVG data URL
-function getTrafficLightSVG(state) {
-  // state: 'red' | 'green'
-  const red = state === 'red' ? '#ff1744' : '#555';
-  const yellow = '#888'; // always dim
-  const green = state === 'green' ? '#00e676' : '#555';
-  const svg = `<svg width='32' height='64' viewBox='0 0 32 64' fill='none' xmlns='http://www.w3.org/2000/svg'>
-    <rect x='6' y='2' width='20' height='60' rx='10' fill='#222' stroke='#444' stroke-width='2'/>
-    <circle cx='16' cy='14' r='7' fill='${red}' stroke='#fff' stroke-width='1.5'/>
-    <circle cx='16' cy='32' r='7' fill='${yellow}' stroke='#fff' stroke-width='1.5'/>
-    <circle cx='16' cy='50' r='7' fill='${green}' stroke='#fff' stroke-width='1.5'/>
-  </svg>`;
-  return 'data:image/svg+xml;utf8,' + encodeURIComponent(svg);
-}
+const trafficRedIcon = {
+  url: 'https://cdn-icons-png.flaticon.com/512/565/565547.png',
+  scaledSize: { width: 32, height: 32 },
+  anchor: { x: 16, y: 32 },
+};
+const trafficGreenIcon = {
+  url: 'https://cdn-icons-png.flaticon.com/512/565/565550.png',
+  scaledSize: { width: 32, height: 32 },
+  anchor: { x: 16, y: 32 },
+};
 
 // Haversine formula for distance in meters
 function haversine(lat1, lon1, lat2, lon2) {
@@ -178,11 +172,7 @@ const MapPage = () => {
           <Marker
             key={'light' + idx}
             position={pos}
-            icon={{
-              url: getTrafficLightSVG(trafficLightStates[idx] ? 'green' : 'red'),
-              scaledSize: { width: 32, height: 64 },
-              anchor: { x: 16, y: 64 },
-            }}
+            icon={trafficLightStates[idx] ? trafficGreenIcon : trafficRedIcon}
             // Optionally, add a glowing effect for green lights
             label={trafficLightStates[idx] ? {
               text: '',
