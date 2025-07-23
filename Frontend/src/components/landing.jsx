@@ -35,36 +35,36 @@ const TrafficLight = ({ darkMode, delay = 0 }) => {
 
 // Steps data for How It Works section
 const steps = [
-  {
-    title: 'Live Video Input',
-    desc: 'Government provides live video feeds or pre-recorded videos from 4 directions (lanes).',
-    icon: <BarChart3 className="w-7 h-7 text-red-500" />,
-    color: 'from-red-500 to-orange-400',
-  },
-  {
-    title: 'Vehicle Detection (YOLO + OpenCV)',
-    desc: 'Each video is processed individually to count vehicles using YOLOv5. Frames are sent to FastAPI backend for real-time inference.',
-    icon: <Clock className="w-7 h-7 text-orange-500" />,
-    color: 'from-orange-400 to-yellow-400',
-  },
-  {
-    title: 'Traffic Logic Controller (Node.js)',
-    desc: 'Gets vehicle counts from FastAPI, applies logic to decide which lane gets green, ensures only one lane is green at a time.',
-    icon: <TrendingUp className="w-7 h-7 text-yellow-500" />,
-    color: 'from-yellow-400 to-green-400',
-  },
-  {
-    title: 'Signal Update to Arduino',
-    desc: 'Sends control signals to Arduino via Wi-Fi (ESP8266). Arduino turns on respective LEDs for the selected lane.',
-    icon: <Zap className="w-7 h-7 text-green-500" />,
-    color: 'from-green-400 to-blue-400',
-  },
-  {
-    title: 'Frontend Display (React)',
-    desc: 'Shows current signal status, vehicle counts, and lane camera feed. Admin can also override in case of emergency.',
-    icon: <BarChart3 className="w-7 h-7 text-blue-500" />,
-    color: 'from-blue-400 to-purple-400',
-  },
+    {
+        title: 'Adaptive Signal Control (YOLO)',
+        desc: 'Traffic signals change dynamically based on real-time vehicle density using YOLOv5 and OpenCV. Four-lane video feeds are analyzed to ensure optimal traffic flow.',
+        icon: <BarChart3 className="w-7 h-7 text-red-500" />,
+        color: 'from-red-500 to-orange-400',
+    },
+    {
+        title: 'Emergency Vehicle Priority',
+        desc: 'If an emergency vehicle is detected in proximity, the system identifies its lane and overrides normal flow to turn its signal green instantly.',
+        icon: <Clock className="w-7 h-7 text-orange-500" />,
+        color: 'from-orange-400 to-yellow-400',
+    },
+    {
+        title: 'Automated Traffic Logic (Node.js)',
+        desc: 'Vehicle counts from each lane are processed by a backend controller which decides which lane gets green. No manual effort required for signal decisions.',
+        icon: <TrendingUp className="w-7 h-7 text-yellow-500" />,
+        color: 'from-yellow-400 to-green-400',
+    },
+    {
+        title: 'Wireless Signal Control (ESP8266)',
+        desc: 'Signal changes are transmitted wirelessly to Arduino using ESP8266, which controls the LEDs corresponding to each traffic light.',
+        icon: <Zap className="w-7 h-7 text-green-500" />,
+        color: 'from-green-400 to-blue-400',
+    },
+    {
+        title: 'Smart Dashboard & Manual Override',
+        desc: 'React-based frontend shows live signal status, vehicle density, and emergency alerts. Traffic officers can override the system manually via a Google Maps interface.',
+        icon: <BarChart3 className="w-7 h-7 text-blue-500" />,
+        color: 'from-blue-400 to-purple-400',
+    }
 ];
 
 const Landing = ({ darkMode, toggleDarkMode }) => {
@@ -291,10 +291,10 @@ const Landing = ({ darkMode, toggleDarkMode }) => {
                                             <h3 className="text-2xl font-bold mb-8 bg-gradient-to-r from-red-500 via-orange-400 to-yellow-500 bg-clip-text text-transparent">🏗️ Tech Stack</h3>
                                             <div className="space-y-4">
                                                 {[
-                                                    { label: "Frontend", value: "React.js", color: "text-blue-400" },
-                                                    { label: "Backend (AI)", value: "FastAPI + YOLOv5 + OpenCV", color: "text-green-400" },
-                                                    { label: "Logic Controller", value: "Node.js + Express", color: "text-yellow-400" },
-                                                    { label: "Hardware", value: "Arduino UNO + ESP8266 Wi-Fi", color: "text-red-400" },
+                                                    { label: "Frontend", value: "React.js, Vercel, Google Maps API", color: "text-blue-400" },
+                                                    { label: "Backend", value: "FastAPI, Render", color: "text-green-400" },
+                                                    { label: "Hardware & AI", value: "ESP8266, LEDs, Resistors, Jumper Wires", color: "text-red-400" },
+                                                    { label: "Modules & Models", value: "QMCLL Module, GPS Module, YOLOv8n.pt, Servo Motor", color: "text-yellow-400" },
                                                     { label: "Communication", value: "HTTP/WebSocket", color: "text-orange-400" }
                                                 ].map((item, idx) => (
                                                     <motion.div
@@ -331,7 +331,7 @@ const Landing = ({ darkMode, toggleDarkMode }) => {
                                                     transition={{ delay: 0.4 }}
                                                 >
                                                     <h4 className="font-semibold mb-3 text-xl text-red-400">Core Rule:</h4>
-                                                    <p className="text-gray-300">Only <strong>1 lane</strong> can have a green signal at any given time</p>
+                                                    <p className="text-gray-300">At any given moment, <strong>only one lane</strong> is permitted to have a green signal to ensure safe and efficient traffic flow.</p>
                                                 </motion.div>
                                                 <motion.div
                                                     className="p-6 rounded-lg bg-[#1a1719]/50 hover:bg-[#1a1719] transition-all duration-300"
@@ -341,10 +341,12 @@ const Landing = ({ darkMode, toggleDarkMode }) => {
                                                     transition={{ delay: 0.5 }}
                                                 >
                                                     <h4 className="font-semibold mb-3 text-xl text-orange-400">Priority Logic:</h4>
-                                                    <div className="bg-[#231E24] p-4 rounded-lg font-mono text-sm text-green-400 shadow-inner">{`if (laneA > laneB && laneA > laneC && laneA > laneD) {\n    green = A\n}`}</div>
+                                                    <div className="bg-[#231E24] p-4 rounded-lg font-mono text-sm text-green-400 shadow-inner">{`if (laneA > laneB && laneA > laneC && laneA > laneD) {\n    green = 'A';\n}`}</div>
+                                                    <p className="text-gray-400 mt-3 text-sm">The lane with the highest vehicle density is prioritized and granted the green signal.</p>
                                                 </motion.div>
                                             </div>
                                         </motion.div>
+
                                     </div>
                                 </div>
                             </motion.div>
