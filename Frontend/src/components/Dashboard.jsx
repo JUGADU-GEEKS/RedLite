@@ -1,8 +1,8 @@
 import React, { useRef, useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import {
-  ArrowUp, ArrowDown, ArrowLeft, ArrowRight, Camera, Eye, Signal
-} from 'lucide-react';
+  ArrowUp, ArrowDown, ArrowLeft, ArrowRight, Camera, Eye, Signal, X
+} from 'lucide-react'; // Import X for close button
 import Navbar from './Navbar';
 
 const laneDetails = {
@@ -20,9 +20,9 @@ const videoFiles = [
 
 function TrafficLight({ signal }) {
   const colorMap = {
-    red: ['red', 'gray', 'gray'],
+    red: ['gray', 'gray', 'red'], // Changed order to match standard traffic light visual (top to bottom: red, yellow, green)
     yellow: ['gray', 'yellow', 'gray'],
-    green: ['gray', 'gray', 'green'],
+    green: ['green', 'gray', 'gray'],
   };
   const tailwindColor = {
     red: 'bg-red-500 shadow-red-500/50 animate-pulse',
@@ -46,13 +46,6 @@ function LaneCard({
   lane, video, data, light, currentGreen, lastGreenTime, vehicleCounts, onManualChange, loading, started, darkMode
 }) {
   const Icon = laneDetails[lane].icon;
-  // Helper for color classes
-  const colorClass = (val) => {
-    if (val === 'green') return 'bg-green-600 text-white px-2 rounded';
-    if (val === 'red') return 'bg-red-600 text-white px-2 rounded';
-    if (val === 'yellow') return 'bg-yellow-400 text-black px-2 rounded';
-    return '';
-  };
   const isCurrentGreen = currentGreen === lane;
   return (
     <motion.div
@@ -114,7 +107,7 @@ function LaneCard({
             Total Vehicles: <span className="font-bold" style={{ color: '#ec4899' }}>{data?.total || 0}</span>
           </div>
           <div className="font-semibold text-center" style={{ color: darkMode ? '#fff' : '#222' }}>
-            Last Green Time: <span className="font-mono" style={{ color: isCurrentGreen ? '#facc15' : '#aaa' }}>{isCurrentGreen ? lastGreenTime : '-'}</span>
+            Last Green Time: <span className="font-mono" style={{ color: isCurrentGreen ? '#facc15' : '#aaa' }}>{lastGreenTime}</span>
           </div>
         </div>
       )}
@@ -151,6 +144,7 @@ function Dashboard({ darkMode, toggleDarkMode, onHowItWorksClick, onHomeClick, o
   const [vehicleCounts, setVehicleCounts] = useState({});
   const [started, setStarted] = useState(false);
   const [loading, setLoading] = useState({});
+  const [ambulancePopup, setAmbulancePopup] = useState({ active: false, message: '' }); // New state for popup
   const wsRef = useRef(null);
 
   const startDetection = () => {
@@ -175,6 +169,17 @@ function Dashboard({ darkMode, toggleDarkMode, onHowItWorksClick, onHomeClick, o
       if (data.current_green) setCurrentGreen(data.current_green);
       if (data.last_green_time) setLastGreenTime(data.last_green_time);
       if (data.vehicle_counts) setVehicleCounts(data.vehicle_counts);
+
+      // Check for ambulance override
+      if (data.override_active) {
+        setAmbulancePopup({
+          active: true,
+          message: `AMBULANCE OVERRIDE ACTIVE: ${data.override_direction.toUpperCase()} GREEN, others RED`
+        });
+      } else if (ambulancePopup.active) {
+        // If override was active but now isn't, hide the popup
+        setAmbulancePopup({ active: false, message: '' });
+      }
     };
     ws.onerror = (err) => {
       console.error('WebSocket error:', err);
@@ -193,7 +198,7 @@ function Dashboard({ darkMode, toggleDarkMode, onHowItWorksClick, onHomeClick, o
     }
   };
 
-  React.useEffect(() => {
+  useEffect(() => {
     return () => {
       if (wsRef.current) {
         wsRef.current.close();
@@ -210,22 +215,6 @@ function Dashboard({ darkMode, toggleDarkMode, onHowItWorksClick, onHomeClick, o
     return `${mins} min${mins > 1 ? 's' : ''} ago`;
   };
 
-  // Helper: Count active lanes
-  const getActiveLanes = () => Object.values(videoData).filter(d => d && d.frame).length;
-  // Helper: Countdown (seconds since last green)
-  const getCountdown = () => {
-    if (!lastGreenTime) return 0;
-    const secondsAgo = Math.floor((Date.now() / 1000) - lastGreenTime);
-    return secondsAgo > 0 ? secondsAgo : 0;
-  };
-  // Helper: Current green lane label
-  const getCurrentGreenLabel = () => {
-    if (!currentGreen) return 'None';
-    return currentGreen.charAt(0).toUpperCase() + currentGreen.slice(1) + ' Lane';
-  };
-  // Helper: Next green lane label (cycle order not tracked, so just show 'None')
-  const getNextGreenLabel = () => 'None';
-
   return (
     <div className={`min-h-screen ${darkMode ? 'bg-gradient-to-br from-[#15171C] via-red-950/30 to-gray-900' : 'bg-gradient-to-br from-gray-50 via-red-50 to-gray-50'} flex flex-col items-center p-4 transition-colors duration-500`} style={darkMode ? { backgroundColor: '#171418', paddingTop: '5.5rem' } : { paddingTop: '5.5rem' }}>
       <Navbar darkMode={darkMode} toggleDarkMode={toggleDarkMode} onHowItWorksClick={onHowItWorksClick} onHomeClick={onHomeClick} onDashboardClick={onDashboardClick} />
@@ -233,6 +222,28 @@ function Dashboard({ darkMode, toggleDarkMode, onHowItWorksClick, onHomeClick, o
       <p className={`text-lg max-w-2xl mx-auto text-center mb-8 ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>
         Real-time vehicle detection and traffic flow analysis using advanced YOLO computer vision technology
       </p>
+
+      {/* Ambulance Override Pop-up */}
+      {ambulancePopup.active && (
+        <motion.div
+          className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-red-600 text-white p-6 rounded-lg shadow-xl z-50 flex flex-col items-center justify-center text-center max-w-sm w-11/12"
+          initial={{ opacity: 0, scale: 0.8 }}
+          animate={{ opacity: 1, scale: 1 }}
+          exit={{ opacity: 0, scale: 0.8 }}
+          transition={{ duration: 0.3 }}
+        >
+          <button
+            onClick={() => setAmbulancePopup({ active: false, message: '' })}
+            className="absolute top-2 right-2 p-1 rounded-full hover:bg-red-700 transition"
+          >
+            <X className="w-5 h-5" />
+          </button>
+          <div className="text-2xl font-bold mb-3">🚨 EMERGENCY OVERRIDE! 🚨</div>
+          <p className="text-lg">{ambulancePopup.message}</p>
+          <p className="mt-2 text-sm opacity-80">System is prioritizing emergency vehicle.</p>
+        </motion.div>
+      )}
+
       {!started && (
         <>
           <motion.button
