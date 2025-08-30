@@ -47,7 +47,7 @@ LANE_VIDEO_MAP = {
     'west': '4.mp4',
 }
 
-TRAFFIC_LIGHT_COORDS = (28.7198611, 77.2621111)
+TRAFFIC_LIGHT_COORDS = ()
 AMBULANCE_OVERRIDE_DURATION = 30  # seconds
 ambulance_override = {
     'active': False,
