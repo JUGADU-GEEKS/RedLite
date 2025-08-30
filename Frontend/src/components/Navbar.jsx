@@ -75,20 +75,6 @@ const Navbar = ({ darkMode, toggleDarkMode }) => {
                         </motion.div>
 
                         <div className="flex items-center space-x-3">
-                            <motion.button
-                                onClick={toggleDarkMode}
-                                className={`p-2 rounded-lg ${
-                                    darkMode 
-                                    ? 'bg-[#171418] text-yellow-400 hover:bg-[#1a1719]' 
-                                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                                } transition-all duration-300 hover:scale-110`}
-                                initial={{ opacity: 0, x: 20 }}
-                                animate={{ opacity: 1, x: 0 }}
-                                transition={{ duration: 0.6, delay: 0.4 }}
-                                whileTap={{ scale: 0.9 }}
-                            >
-                                {darkMode ? <Sun size={18} /> : <Moon size={18} />}
-                            </motion.button>
 
                             <motion.a
                                 href="https://github.com/JUGADU-GEEKS/RedLite"
