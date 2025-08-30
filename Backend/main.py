@@ -1,3 +1,4 @@
+
 ## Importing Modules
 from fastapi import FastAPI
 from fastapi import WebSocket
@@ -11,6 +12,10 @@ import logging
 import time
 import json
 from fastapi import Request
+import json
+import smtplib
+from email.mime.text import MIMEText
+from getpass import getpass
 from math import radians, cos, sin, asin, sqrt
 logging.getLogger("ultralytics").setLevel(logging.WARNING)
 
@@ -18,6 +23,43 @@ logging.getLogger("ultralytics").setLevel(logging.WARNING)
 app = FastAPI()
 
 # Variables
+def send_alert_email():
+    # Load data.json
+    with open('data.json', 'r') as f:
+        data = json.load(f)
+    # Find the email for Connaught Place, Delhi
+    location = 'Connaught Place, Delhi'
+    try:
+        idx = data['locations'].index(location)
+        to_email = data['emails'][idx]
+    except (ValueError, KeyError, IndexError):
+        print('Location or email not found!')
+        return
+
+    from_email = 'devang9890@gmail.com'
+    subject = f'Emergency Alert at {location}'
+    body = f'Emergency Alert at {location}'
+
+    # App password for devang9890@gmail.com (App Name: agent)
+    app_password = 'vptx slib tbbs qdpa'
+
+    # Create the email message
+    msg = MIMEText(body)
+    msg['Subject'] = subject
+    msg['From'] = from_email
+    msg['To'] = to_email
+
+    try:
+        # Connect to Gmail SMTP server
+        with smtplib.SMTP_SSL('smtp.gmail.com', 465) as server:
+            server.login(from_email, app_password)
+            server.sendmail(from_email, [to_email], msg.as_string())
+        print(f'Email sent to {to_email}')
+    except Exception as e:
+        print('Failed to send email:', e)
+
+# Uncomment the line below to test sending the email
+send_alert_email()
 lights = {
     "north": "red",
     "south": "red",
