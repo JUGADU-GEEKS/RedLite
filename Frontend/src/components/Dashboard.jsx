@@ -218,7 +218,7 @@ function Dashboard({ darkMode, toggleDarkMode, onHowItWorksClick, onHomeClick, o
   return (
     <div className={`min-h-screen ${darkMode ? 'bg-gradient-to-br from-[#15171C] via-red-950/30 to-gray-900' : 'bg-gradient-to-br from-gray-50 via-red-50 to-gray-50'} flex flex-col items-center p-4 transition-colors duration-500`} style={darkMode ? { backgroundColor: '#171418', paddingTop: '5.5rem' } : { paddingTop: '5.5rem' }}>
       <Navbar darkMode={darkMode} toggleDarkMode={toggleDarkMode} onHowItWorksClick={onHowItWorksClick} onHomeClick={onHomeClick} onDashboardClick={onDashboardClick} />
-      <h1 className={`text-4xl font-bold text-center text-transparent bg-clip-text ${darkMode ? 'bg-gradient-to-r from-[#7C818C] via-[#493A45] to-orange-200' : 'bg-gradient-to-r from-red-600 via-red-500 to-orange-500'} mt-8 mb-6 font-serif`}>Red Light Dashboard</h1>
+      <h1 className={`text-4xl font-bold text-center text-transparent bg-clip-text ${darkMode ? 'bg-gradient-to-r from-[#7C818C] via-[#493A45] to-orange-200' : 'bg-gradient-to-r from-red-600 via-red-500 to-orange-500'} mt-8 mb-6 font-serif`}>Lanezy Dashboard</h1>
       <p className={`text-lg max-w-2xl mx-auto text-center mb-8 ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>
         Real-time vehicle detection and traffic flow analysis using advanced YOLO computer vision technology
       </p>
