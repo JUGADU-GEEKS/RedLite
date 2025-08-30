@@ -1,6 +1,7 @@
 
 ## Importing Modules
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi import WebSocket
 from fastapi.responses import HTMLResponse
 import os
@@ -19,26 +20,39 @@ from getpass import getpass
 from math import radians, cos, sin, asin, sqrt
 logging.getLogger("ultralytics").setLevel(logging.WARNING)
 
+
 # Initialising Apps
 app = FastAPI()
+# Enable CORS for all origins (for development)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 # Variables
-def send_alert_email():
+
+def send_alert_email(location, alert_type='emergency'):
     # Load data.json
     with open('data.json', 'r') as f:
         data = json.load(f)
-    # Find the email for Connaught Place, Delhi
-    location = 'Connaught Place, Delhi'
+    # Find the email for the given location
     try:
         idx = data['locations'].index(location)
         to_email = data['emails'][idx]
     except (ValueError, KeyError, IndexError):
         print('Location or email not found!')
-        return
+        return False
 
     from_email = 'devang9890@gmail.com'
-    subject = f'Emergency Alert at {location}'
-    body = f'Emergency Alert at {location}'
+    if alert_type == 'breakdown':
+        subject = f'Vehicle Breakdown spotted at {location}'
+        body = f'Vehicle Breakdown spotted at {location}'
+    else:
+        subject = f'Cow on road at {location}'
+        body = f'Cow spotted still at {location}'
 
     # App password for devang9890@gmail.com (App Name: agent)
     app_password = 'vptx slib tbbs qdpa'
@@ -55,11 +69,35 @@ def send_alert_email():
             server.login(from_email, app_password)
             server.sendmail(from_email, [to_email], msg.as_string())
         print(f'Email sent to {to_email}')
+        return True
     except Exception as e:
         print('Failed to send email:', e)
+        return False
 
-# Uncomment the line below to test sending the email
-send_alert_email()
+
+# Lane to location mapping
+LANE_TO_LOCATION = {
+    'north': 'Connaught Place, Delhi',
+    'south': 'Chandni Chowk, Delhi',
+    'east': 'Hauz Khas, Delhi',
+    'west': 'Hauz Khas, Delhi',  # Update if you have a different location for west
+}
+
+# API endpoint to send breakdown alert
+from fastapi import Body
+from fastapi.responses import JSONResponse
+
+@app.post('/send_breakdown_alert')
+async def send_breakdown_alert(data: dict = Body(...)):
+    lane = data.get('lane')
+    location = LANE_TO_LOCATION.get(lane)
+    if not location:
+        return JSONResponse({'status': 'error', 'message': 'Invalid lane'}, status_code=400)
+    success = send_alert_email(location, alert_type='breakdown')
+    if success:
+        return {'status': 'ok'}
+    else:
+        return JSONResponse({'status': 'error', 'message': 'Failed to send email'}, status_code=500)
 lights = {
     "north": "red",
     "south": "red",
@@ -143,6 +181,7 @@ async def websocket_detect(websocket: WebSocket):
     model = YOLO(MODEL_PATH)
     caps = {lane: cv2.VideoCapture(os.path.join(VIDEOS_DIR, video)) for lane, video in LANE_VIDEO_MAP.items()}
     vehicle_counts = {lane: 0 for lane in LANE_VIDEO_MAP}
+    cow_alert_sent = {lane: False for lane in LANE_VIDEO_MAP}  # Track if alert sent for cow in each lane
     global lights, last_changed, current_green, last_green_time, last_switch_time
     lights = {lane: "red" for lane in LANE_VIDEO_MAP}
     current_green = None
@@ -218,12 +257,29 @@ async def websocket_detect(websocket: WebSocket):
                 results = model(frame)
                 boxes = results[0].boxes
                 counts = {'car': 0, 'motorcycle': 0, 'bus': 0}
+                cow_detected = False
+                detected_classes = []
                 for box in boxes:
                     cls = int(box.cls[0])
+                    detected_classes.append(cls)
+                    # Treat class 19 as 'cow' for this model
+                    if cls == 19:
+                        cow_detected = True
                     for name, class_id in VEHICLE_CLASSES.items():
                         if cls == class_id:
                             counts[name] += 1
+                print(f"[DEBUG] Lane: {lane}, Detected class IDs: {detected_classes}")
                 vehicle_counts[lane] = sum(counts.values())
+                # Send cow alert if detected and not already sent
+                if cow_detected and not cow_alert_sent[lane]:
+                    location = LANE_TO_LOCATION.get(lane)
+                    print(f"[DEBUG] Cow detected in {lane}, preparing to send alert email to {location}")
+                    if location:
+                        send_alert_email(location, alert_type='cow')
+                        cow_alert_sent[lane] = True
+                        print(f"[ALERT] Cow detected in {lane}, alert sent!")
+                elif not cow_detected:
+                    cow_alert_sent[lane] = False  # Reset if cow is gone
                 annotated_frame = results[0].plot()
                 _, buffer = cv2.imencode('.jpg', annotated_frame)
                 frame_b64 = base64.b64encode(buffer).decode('utf-8')

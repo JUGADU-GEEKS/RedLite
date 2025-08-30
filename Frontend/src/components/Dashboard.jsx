@@ -1,7 +1,7 @@
 import React, { useRef, useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import {
-  ArrowUp, ArrowDown, ArrowLeft, ArrowRight, Camera, Eye, Signal, X
+  ArrowUp, ArrowDown, ArrowLeft, ArrowRight, Camera, Eye, Signal, X, AlertCircle
 } from 'lucide-react'; // Import X for close button
 import Navbar from './Navbar';
 
@@ -137,6 +137,30 @@ const StatsCard = ({ title, value, icon: Icon, color = "red", darkMode, delay = 
 };
 
 function Dashboard({ darkMode, toggleDarkMode, onHowItWorksClick, onHomeClick, onDashboardClick }) {
+  const [breakdownLoading, setBreakdownLoading] = useState({});
+  const [breakdownMsg, setBreakdownMsg] = useState('');
+  // Send breakdown alert to backend
+  const handleBreakdownAlert = async (lane) => {
+    setBreakdownLoading(prev => ({ ...prev, [lane]: true }));
+    setBreakdownMsg('');
+    try {
+      const res = await fetch('http://localhost:8000/send_breakdown_alert', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ lane })
+      });
+      const data = await res.json();
+      if (data.status === 'ok') {
+        setBreakdownMsg(`Breakdown alert sent for ${laneDetails[lane].label}`);
+      } else {
+        setBreakdownMsg('Failed to send breakdown alert.');
+      }
+    } catch (e) {
+      setBreakdownMsg('Error sending breakdown alert.');
+    }
+    setTimeout(() => setBreakdownMsg(''), 3000);
+    setBreakdownLoading(prev => ({ ...prev, [lane]: false }));
+  };
   const [videoData, setVideoData] = useState({});
   const [lights, setLights] = useState({});
   const [currentGreen, setCurrentGreen] = useState(null);
@@ -259,8 +283,48 @@ function Dashboard({ darkMode, toggleDarkMode, onHowItWorksClick, onHomeClick, o
           </motion.button>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
             {videoFiles.map(({ file, lane }) => (
+              <div key={file} className="flex items-center gap-4">
+                {/* Breakdown Alert Button */}
+                <button
+                  className={`flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center bg-red-500 hover:bg-red-700 text-white shadow-lg transition-all duration-200 ${breakdownLoading[lane] ? 'opacity-60 cursor-not-allowed' : ''}`}
+                  title={`Send Breakdown Alert for ${laneDetails[lane].label}`}
+                  onClick={() => handleBreakdownAlert(lane)}
+                  disabled={breakdownLoading[lane]}
+                >
+                  <AlertCircle className="w-6 h-6" />
+                </button>
+                <LaneCard
+                  lane={lane}
+                  video={file}
+                  data={videoData[file]}
+                  light={lights[lane] || 'red'}
+                  currentGreen={currentGreen}
+                  lastGreenTime={formatLastGreenAgo(lastGreenTime)}
+                  vehicleCounts={vehicleCounts}
+                  onManualChange={handleManualChange}
+                  loading={loading[lane]}
+                  started={false}
+                  darkMode={darkMode}
+                />
+              </div>
+            ))}
+          </div>
+        </>
+      )}
+      {started && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+          {videoFiles.map(({ file, lane }) => (
+            <div key={file} className="flex items-center gap-4">
+              {/* Breakdown Alert Button */}
+              <button
+                className={`flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center bg-red-500 hover:bg-red-700 text-white shadow-lg transition-all duration-200 ${breakdownLoading[lane] ? 'opacity-60 cursor-not-allowed' : ''}`}
+                title={`Send Breakdown Alert for ${laneDetails[lane].label}`}
+                onClick={() => handleBreakdownAlert(lane)}
+                disabled={breakdownLoading[lane]}
+              >
+                <AlertCircle className="w-6 h-6" />
+              </button>
               <LaneCard
-                key={file}
                 lane={lane}
                 video={file}
                 data={videoData[file]}
@@ -270,31 +334,17 @@ function Dashboard({ darkMode, toggleDarkMode, onHowItWorksClick, onHomeClick, o
                 vehicleCounts={vehicleCounts}
                 onManualChange={handleManualChange}
                 loading={loading[lane]}
-                started={false}
+                started={true}
                 darkMode={darkMode}
               />
-            ))}
-          </div>
-        </>
-      )}
-      {started && (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-          {videoFiles.map(({ file, lane }) => (
-            <LaneCard
-              key={file}
-              lane={lane}
-              video={file}
-              data={videoData[file]}
-              light={lights[lane] || 'red'}
-              currentGreen={currentGreen}
-              lastGreenTime={formatLastGreenAgo(lastGreenTime)}
-              vehicleCounts={vehicleCounts}
-              onManualChange={handleManualChange}
-              loading={loading[lane]}
-              started={true}
-              darkMode={darkMode}
-            />
+            </div>
           ))}
+        </div>
+      )}
+      {/* Breakdown Alert Message */}
+      {breakdownMsg && (
+        <div className="fixed bottom-8 left-1/2 -translate-x-1/2 bg-red-600 text-white px-6 py-3 rounded-full shadow-lg z-50 text-lg animate-bounce">
+          {breakdownMsg}
         </div>
       )}
     </div>
