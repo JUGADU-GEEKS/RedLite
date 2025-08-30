@@ -4,8 +4,9 @@ import { Sun, Moon, Linkedin, Github, Users, Code, Palette, Database } from 'luc
 import devangImg from '../assets/devang_singh.jpg';
 import dhruvImg from '../assets/dhruv_sharma.jpg';
 import kunalImg from '../assets/kunal_sharma.jpg';
-import sakshiImg from '../assets/sakshi_singh.jpg';
-import sangyaImg from '../assets/sangya_ojha.jpg';
+// import sakshiImg from '../assets/sakshi_singh.jpg';
+// import sangyaImg from '../assets/sangya_ojha.jpg';
+import purabImg from '../assets/purab.jpg';
 import Navbar from "./Navbar";
 
 
@@ -111,13 +112,13 @@ const Team = ({ darkMode, toggleDarkMode, onHowItWorksClick, onHomeClick, onDash
             linkedin: "https://www.linkedin.com/in/dhruv-sharma-331379154/",
             github: "https://github.com/dhruv0050"
         },
-        {
-            name: "Sangya Ojha",
-            role: "Full Stack Developer",
-            image: sangyaImg,
-            linkedin: "https://www.linkedin.com/in/sangya-ojha-7a58a22a3/",
-            github: "https://github.com/sangya-25"
-        },
+        // {
+        //     name: "Sangya Ojha",
+        //     role: "Full Stack Developer",
+        //     image: sangyaImg,
+        //     linkedin: "https://www.linkedin.com/in/sangya-ojha-7a58a22a3/",
+        //     github: "https://github.com/sangya-25"
+        // },
         {
             name: "Devang Singh",
             role: "Full Stack Developer",
@@ -126,12 +127,19 @@ const Team = ({ darkMode, toggleDarkMode, onHowItWorksClick, onHomeClick, onDash
             github: "https://github.com/devang9890"
         },
         {
-            name: "Sakshi Singh",
+            name: "Purab",
             role: "Full Stack Developer",
-            image: sakshiImg,
-            linkedin: "https://www.linkedin.com/in/sakshi-singh-5176b9373?utm_source=share&utm_campaign=share_via&utm_content=profile&utm_medium=android_app",
-            github: "http://GitHub.com/sakshisingh85"
+            image: purabImg,
+            linkedin: "https://www.linkedin.com/in/purab-nigam-48a31326b?utm_source=share&utm_campaign=share_via&utm_content=profile&utm_medium=android_app",
+            github: "https://github.com/Purabnigam123"
         }
+        // {
+        //     name: "Sakshi Singh",
+        //     role: "Full Stack Developer",
+        //     image: sakshiImg,
+        //     linkedin: "https://www.linkedin.com/in/sakshi-singh-5176b9373?utm_source=share&utm_campaign=share_via&utm_content=profile&utm_medium=android_app",
+        //     github: "http://GitHub.com/sakshisingh85"
+        // }
     ];
 
     return (
