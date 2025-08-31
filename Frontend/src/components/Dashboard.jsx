@@ -1,9 +1,8 @@
 import React, { useRef, useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import {
-  ArrowUp, ArrowDown, ArrowLeft, ArrowRight, Camera, Eye, Signal, X, AlertCircle
-} from 'lucide-react'; // Import X for close button
-import Navbar from './Navbar';
+  ArrowUp, ArrowDown, ArrowLeft, ArrowRight, Eye, X, AlertCircle, Home, BarChart3, Map, Users, HelpCircle
+} from 'lucide-react';
 
 const laneDetails = {
   north: { label: 'North Lane', icon: ArrowUp, color: 'from-blue-500 to-cyan-500' },
@@ -11,6 +10,7 @@ const laneDetails = {
   east: { label: 'East Lane', icon: ArrowRight, color: 'from-purple-500 to-pink-500' },
   west: { label: 'West Lane', icon: ArrowLeft, color: 'from-orange-500 to-red-500' },
 };
+
 const videoFiles = [
   { file: '1.mp4', lane: 'north' },
   { file: '2.mp4', lane: 'south' },
@@ -18,62 +18,95 @@ const videoFiles = [
   { file: '4.mp4', lane: 'west' },
 ];
 
+// Floating elements for background decoration
+const FloatingElement = ({ children, delay = 0, duration = 3 }) => (
+  <motion.div
+    animate={{
+      y: [-10, 10, -10],
+      rotate: [-2, 2, -2],
+    }}
+    transition={{
+      duration,
+      repeat: Infinity,
+      ease: "easeInOut",
+      delay,
+    }}
+  >
+    {children}
+  </motion.div>
+);
+
 function TrafficLight({ signal }) {
   const colorMap = {
-    red: ['gray', 'gray', 'red'], // Changed order to match standard traffic light visual (top to bottom: red, yellow, green)
+    red: ['red', 'gray', 'gray'],
     yellow: ['gray', 'yellow', 'gray'],
-    green: ['green', 'gray', 'gray'],
+    green: ['gray', 'gray', 'green'],
   };
   const tailwindColor = {
-    red: 'bg-red-500 shadow-red-500/50 animate-pulse',
-    yellow: 'bg-yellow-400 shadow-yellow-400/50 animate-pulse',
-    green: 'bg-green-500 shadow-green-500/50 animate-pulse',
-    gray: 'bg-gray-600 opacity-40',
+    red: 'bg-red-500',
+    yellow: 'bg-yellow-400',
+    green: 'bg-green-500',
+    gray: 'bg-gray-500/40',
+  };
+  const glowMap = {
+    red: 'shadow-[0_0_12px_rgba(239,68,68,0.5)]',
+    yellow: 'shadow-[0_0_12px_rgba(250,204,21,0.5)]',
+    green: 'shadow-[0_0_12px_rgba(34,197,94,0.5)]',
+    gray: '',
   };
   const colors = colorMap[signal] || ['gray', 'gray', 'gray'];
   return (
-    <div className="absolute top-4 left-4 z-20">
-      <div className="bg-white/80 backdrop-blur-md rounded-lg p-2 flex flex-col gap-1 shadow-xl border border-gray-200">
-        {[0, 1, 2].map(i => (
-          <div key={i} className={`w-3 h-3 rounded-full transition-all duration-300 ${tailwindColor[colors[i]]}`} />
-        ))}
+    <div className="absolute -top-4 -left-12 z-20">
+      <div className="bg-gradient-to-b from-gray-600 to-gray-800 border-2 border-gray-300/50 rounded-xl px-2 py-3 flex flex-col items-center gap-2.5 shadow-xl">
+        {[0, 1, 2].map(i => {
+          const color = colors[i];
+          const glow = glowMap[color];
+          return (
+            <div
+              key={i}
+              className={`w-5 h-5 rounded-full ${tailwindColor[color]} ${glow} transition-all duration-500`}
+            />
+          );
+        })}
       </div>
     </div>
   );
 }
 
 function LaneCard({
-  lane, video, data, light, currentGreen, lastGreenTime, vehicleCounts, onManualChange, loading, started, darkMode
+  lane, video, data, light, currentGreen, lastGreenTime, vehicleCounts, onManualChange, loading, started
 }) {
-  const Icon = laneDetails[lane].icon;
-  const isCurrentGreen = currentGreen === lane;
+  let borderColor = 'border-gray-300/50';
+  let borderGlow = '';
+  if (light === 'red') {
+    borderColor = 'border-red-400/60';
+    borderGlow = 'shadow-[0_0_20px_rgba(239,68,68,0.15)]';
+  } else if (light === 'yellow') {
+    borderColor = 'border-yellow-400/60';
+    borderGlow = 'shadow-[0_0_20px_rgba(250,204,21,0.15)]';
+  } else if (light === 'green') {
+    borderColor = 'border-green-400/60';
+    borderGlow = 'shadow-[0_0_20px_rgba(34,197,94,0.15)]';
+  }
+
   return (
     <motion.div
-      className={`relative w-full max-w-md h-auto bg-white border-2 border-gradient-to-r ${laneDetails[lane].color} backdrop-blur-sm rounded-3xl p-6 shadow-2xl overflow-hidden transition-all duration-300 hover:shadow-xl ${darkMode ? 'bg-gray-800 border-gray-700' : ''}`}
+      className={`relative w-full max-w-md h-auto bg-white/80 backdrop-blur-sm border-[3px] ${borderColor} ${borderGlow} rounded-2xl pl-6 pr-6 pt-4 pb-4 shadow-xl overflow-visible transition-all duration-500 hover:shadow-2xl hover:bg-white/90`}
       initial={{ opacity: 0, y: 40 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.6 }}
       whileHover={{ y: -5, scale: 1.02 }}
     >
       <TrafficLight signal={light} />
-      <div className="flex items-center justify-center mb-6">
-        <div className={`w-12 h-12 bg-gradient-to-r ${laneDetails[lane].color} rounded-full flex items-center justify-center shadow-lg ${isCurrentGreen ? 'ring-4 ring-green-400' : ''}`}>
-          <Icon className="w-6 h-6 text-white" />
-        </div>
-        <div className="ml-4">
-          <h3 className={`text-lg font-bold ${darkMode ? 'text-white' : 'text-gray-900'}`}>{laneDetails[lane].label}</h3>
-          <div className="flex items-center gap-2">
-            <Camera className={`w-4 h-4 ${darkMode ? 'text-gray-400' : 'text-gray-600'}`} />
-            <span className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>Lane {videoFiles.findIndex(v => v.lane === lane) + 1}</span>
-          </div>
-        </div>
+      <div className="flex flex-col items-start justify-start mb-4">
+        <h3 className="text-xl tracking-wide text-gray-800 font-semibold">{laneDetails[lane].label}</h3>
       </div>
-      <div className="relative rounded-2xl overflow-hidden">
+      <div className="relative rounded-xl overflow-hidden shadow-lg">
         {started && data && data.frame ? (
           <img
             src={`data:image/jpeg;base64,${data.frame}`}
             alt={`Detected Frame for ${video}`}
-            className="w-full h-48 object-cover bg-black"
+            className="w-full h-52 object-cover bg-black"
           />
         ) : (
           <video
@@ -82,32 +115,33 @@ function LaneCard({
             loop
             muted
             playsInline
-            className="w-full h-48 object-cover bg-black"
+            className="w-full h-52 object-cover bg-black"
           />
         )}
         <div className="absolute top-3 right-3">
-          <div className="bg-green-500/90 backdrop-blur-sm rounded-full p-2 animate-pulse">
+          <div className="bg-gray-900/80 backdrop-blur-sm rounded-full p-1.5">
             <Eye className="w-4 h-4 text-white" />
           </div>
         </div>
       </div>
-      <div className="absolute top-4 right-4">
-        <div className={`w-3 h-3 rounded-full ${loading ? 'bg-yellow-400 animate-pulse' : data && data.frame ? 'bg-green-400' : 'bg-gray-500'}`} />
+      <div className="absolute top-6 right-6">
+        <div className={`w-2 h-2 rounded-full ${loading ? 'bg-amber-400 animate-pulse' : data && data.frame ? 'bg-emerald-400' : 'bg-gray-500'}`} />
       </div>
-      <button
+      <motion.button
         onClick={() => onManualChange(lane)}
-        className="mt-4 px-4 py-1 bg-blue-600 text-white rounded shadow hover:bg-blue-700 transition text-sm"
+        className="mt-4 px-6 py-3 bg-gradient-to-r from-amber-500 to-orange-500 text-white rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 text-sm font-semibold hover:from-amber-600 hover:to-orange-600"
+        whileHover={{ scale: 1.05 }}
+        whileTap={{ scale: 0.98 }}
       >
         Change Manually
-      </button>
-      {/* Stats Section */}
+      </motion.button>
       {started && (
-        <div className={`flex flex-col gap-2 mt-4 text-lg items-center w-full ${darkMode ? 'bg-[#181e26]/90 rounded-xl p-4' : ''}`}>
-          <div className="font-semibold text-center" style={{ color: darkMode ? '#fff' : '#222' }}>
-            Total Vehicles: <span className="font-bold" style={{ color: '#ec4899' }}>{data?.total || 0}</span>
+        <div className="flex flex-col gap-3 mt-4 items-start w-full">
+          <div className="text-base text-gray-700 font-medium">
+            Total Vehicles: <span className="font-mono ml-1 text-amber-600 font-bold">{data?.total || 0}</span>
           </div>
-          <div className="font-semibold text-center" style={{ color: darkMode ? '#fff' : '#222' }}>
-            Last Green Time: <span className="font-mono" style={{ color: isCurrentGreen ? '#facc15' : '#aaa' }}>{lastGreenTime}</span>
+          <div className="text-base text-gray-700 font-medium">
+            Last Green Time: <span className="font-mono ml-1 text-amber-600 font-bold">{lastGreenTime}</span>
           </div>
         </div>
       )}
@@ -115,31 +149,75 @@ function LaneCard({
   );
 }
 
-// Stats Card Component
-const StatsCard = ({ title, value, icon: Icon, color = "red", darkMode, delay = 0 }) => {
+const StatsCard = ({ title, value, icon: Icon, delay = 0 }) => {
   return (
     <motion.div
-      className={`${darkMode ? 'bg-[#171418] border-2 border-gradient-to-r from-red-500 to-orange-400' : 'bg-white border-2 border-gradient-to-r from-red-400 to-orange-300'} rounded-xl p-6 backdrop-blur-sm hover:shadow-xl ${darkMode ? 'hover:shadow-red-500/10' : 'hover:shadow-red-500/10'} transition-all duration-300`}
+      className="bg-white/80 backdrop-blur-sm border-2 border-orange-200/50 rounded-2xl p-6 hover:shadow-xl hover:shadow-orange-500/10 transition-all duration-300"
       initial={{ opacity: 0, y: 40 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.6, delay }}
       whileHover={{ y: -5, scale: 1.05 }}
     >
       <div className="flex items-center justify-between mb-4">
-        <h3 className={`text-sm font-medium ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>{title}</h3>
-        <span className={`w-10 h-10 flex items-center justify-center rounded-full bg-gradient-to-br from-red-500 via-orange-400 to-yellow-400 shadow-lg`}>
+        <h3 className="text-sm font-medium text-gray-600">{title}</h3>
+        <span className="w-10 h-10 flex items-center justify-center rounded-full bg-gradient-to-br from-amber-500 via-orange-400 to-yellow-400 shadow-lg">
           <Icon className="w-5 h-5 text-white" />
         </span>
       </div>
-      <div className={`text-3xl font-bold mb-2 ${darkMode ? 'text-white' : 'text-gray-900'}`}>{value}</div>
+      <div className="text-3xl font-bold mb-2 text-gray-900">{value}</div>
     </motion.div>
   );
 };
 
-function Dashboard({ darkMode, toggleDarkMode, onHowItWorksClick, onHomeClick, onDashboardClick }) {
+// Simple Navbar component
+const Navbar = ({ onHowItWorksClick, onHomeClick, onDashboardClick, onMapClick, onTeamClick }) => (
+  <nav className="fixed top-0 left-0 right-0 z-50 bg-white/80 backdrop-blur-md border-b border-gray-200/50 shadow-lg">
+    <div className="max-w-7xl mx-auto px-6 py-4">
+      <div className="flex justify-between items-center">
+        <motion.h1 
+          className="text-2xl font-bold bg-gradient-to-r from-amber-600 to-orange-600 bg-clip-text text-transparent"
+          whileHover={{ scale: 1.05 }}
+        >
+          Lanezy
+        </motion.h1>
+        <div className="flex space-x-8">
+          {[
+            { label: 'Home', onClick: onHomeClick, icon: Home },
+            { label: 'Dashboard', onClick: onDashboardClick, icon: BarChart3 },
+            { label: 'How It Works', onClick: onHowItWorksClick, icon: HelpCircle },
+            { label: 'Map', onClick: onMapClick, icon: Map },
+            { label: 'Team', onClick: onTeamClick, icon: Users }
+          ].map(({ label, onClick, icon: Icon }) => (
+            <motion.button
+              key={label}
+              onClick={onClick}
+              className="flex items-center space-x-2 px-4 py-2 rounded-lg text-gray-700 hover:text-amber-600 hover:bg-amber-50 transition-all duration-300"
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+            >
+              <Icon className="w-4 h-4" />
+              <span>{label}</span>
+            </motion.button>
+          ))}
+        </div>
+      </div>
+    </div>
+  </nav>
+);
+
+function Dashboard({ onHowItWorksClick, onHomeClick, onDashboardClick, onMapClick, onTeamClick }) {
   const [breakdownLoading, setBreakdownLoading] = useState({});
   const [breakdownMsg, setBreakdownMsg] = useState('');
-  // Send breakdown alert to backend
+  const [videoData, setVideoData] = useState({});
+  const [lights, setLights] = useState({});
+  const [currentGreen, setCurrentGreen] = useState(null);
+  const [lastGreenTime, setLastGreenTime] = useState(null);
+  const [vehicleCounts, setVehicleCounts] = useState({});
+  const [started, setStarted] = useState(false);
+  const [loading, setLoading] = useState({});
+  const [ambulancePopup, setAmbulancePopup] = useState({ active: false, message: '' });
+  const wsRef = useRef(null);
+
   const handleBreakdownAlert = async (lane) => {
     setBreakdownLoading(prev => ({ ...prev, [lane]: true }));
     setBreakdownMsg('');
@@ -161,15 +239,6 @@ function Dashboard({ darkMode, toggleDarkMode, onHowItWorksClick, onHomeClick, o
     setTimeout(() => setBreakdownMsg(''), 3000);
     setBreakdownLoading(prev => ({ ...prev, [lane]: false }));
   };
-  const [videoData, setVideoData] = useState({});
-  const [lights, setLights] = useState({});
-  const [currentGreen, setCurrentGreen] = useState(null);
-  const [lastGreenTime, setLastGreenTime] = useState(null);
-  const [vehicleCounts, setVehicleCounts] = useState({});
-  const [started, setStarted] = useState(false);
-  const [loading, setLoading] = useState({});
-  const [ambulancePopup, setAmbulancePopup] = useState({ active: false, message: '' }); // New state for popup
-  const wsRef = useRef(null);
 
   const startDetection = () => {
     if (wsRef.current) return;
@@ -194,14 +263,12 @@ function Dashboard({ darkMode, toggleDarkMode, onHowItWorksClick, onHomeClick, o
       if (data.last_green_time) setLastGreenTime(data.last_green_time);
       if (data.vehicle_counts) setVehicleCounts(data.vehicle_counts);
 
-      // Check for ambulance override
       if (data.override_active) {
         setAmbulancePopup({
           active: true,
           message: `AMBULANCE OVERRIDE ACTIVE: ${data.override_direction.toUpperCase()} GREEN, others RED`
         });
       } else if (ambulancePopup.active) {
-        // If override was active but now isn't, hide the popup
         setAmbulancePopup({ active: false, message: '' });
       }
     };
@@ -230,7 +297,6 @@ function Dashboard({ darkMode, toggleDarkMode, onHowItWorksClick, onHomeClick, o
     };
   }, []);
 
-  // Helper for formatting last green time as relative
   const formatLastGreenAgo = (t) => {
     if (!t) return '-';
     const secondsAgo = Math.floor((Date.now() / 1000) - t);
@@ -240,59 +306,165 @@ function Dashboard({ darkMode, toggleDarkMode, onHowItWorksClick, onHomeClick, o
   };
 
   return (
-    <div className={`min-h-screen ${darkMode ? 'bg-gradient-to-br from-[#15171C] via-red-950/30 to-gray-900' : 'bg-gradient-to-br from-gray-50 via-red-50 to-gray-50'} flex flex-col items-center p-4 transition-colors duration-500`} style={darkMode ? { backgroundColor: '#171418', paddingTop: '5.5rem' } : { paddingTop: '5.5rem' }}>
-      <Navbar darkMode={darkMode} toggleDarkMode={toggleDarkMode} onHowItWorksClick={onHowItWorksClick} onHomeClick={onHomeClick} onDashboardClick={onDashboardClick} />
-      <h1 className={`text-4xl font-bold text-center text-transparent bg-clip-text ${darkMode ? 'bg-gradient-to-r from-[#7C818C] via-[#493A45] to-orange-200' : 'bg-gradient-to-r from-red-600 via-red-500 to-orange-500'} mt-8 mb-6 font-serif`}>Lanezy Dashboard</h1>
-      <p className={`text-lg max-w-2xl mx-auto text-center mb-8 ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>
-        Real-time vehicle detection and traffic flow analysis using advanced YOLO computer vision technology
-      </p>
+    <div className="min-h-screen bg-gradient-to-br from-amber-50 via-orange-50 to-yellow-50 relative overflow-hidden">
+      {/* Enhanced background elements - similar to landing */}
+      <div className="absolute inset-0 overflow-hidden">
+        {/* Soft gradient orbs */}
+        <div className="absolute top-10 left-10 w-96 h-96 bg-gradient-to-br from-amber-200/20 to-orange-200/20 rounded-full blur-3xl"></div>
+        <div className="absolute top-40 right-20 w-80 h-80 bg-gradient-to-br from-yellow-200/20 to-amber-200/20 rounded-full blur-3xl"></div>
+        <div className="absolute bottom-20 left-1/4 w-72 h-72 bg-gradient-to-br from-orange-200/20 to-red-200/20 rounded-full blur-3xl"></div>
 
-      {/* Ambulance Override Pop-up */}
-      {ambulancePopup.active && (
+        {/* Floating geometric shapes */}
+        <div className="absolute top-20 right-1/4">
+          <FloatingElement delay={0}>
+            <div className="w-6 h-6 bg-gradient-to-br from-amber-400/30 to-orange-400/30 rounded-lg rotate-45"></div>
+          </FloatingElement>
+        </div>
+        <div className="absolute bottom-1/3 left-10">
+          <FloatingElement delay={1} duration={4}>
+            <div className="w-4 h-4 bg-gradient-to-br from-yellow-400/30 to-amber-400/30 rounded-full"></div>
+          </FloatingElement>
+        </div>
+        <div className="absolute top-1/3 left-1/3">
+          <FloatingElement delay={2} duration={5}>
+            <div className="w-8 h-2 bg-gradient-to-r from-orange-400/30 to-red-400/30 rounded-full"></div>
+          </FloatingElement>
+        </div>
+      </div>
+
+      <div className="relative z-10 flex flex-col items-center p-4 transition-colors duration-500" style={{ paddingTop: '5.5rem' }}>
+        <Navbar 
+          onHowItWorksClick={onHowItWorksClick} 
+          onHomeClick={onHomeClick} 
+          onDashboardClick={onDashboardClick}
+          onMapClick={onMapClick}
+          onTeamClick={onTeamClick}
+        />
+        
+        {/* Enhanced Header Section */}
         <motion.div
-          className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-red-600 text-white p-6 rounded-lg shadow-xl z-50 flex flex-col items-center justify-center text-center max-w-sm w-11/12"
-          initial={{ opacity: 0, scale: 0.8 }}
-          animate={{ opacity: 1, scale: 1 }}
-          exit={{ opacity: 0, scale: 0.8 }}
-          transition={{ duration: 0.3 }}
+          className="text-center mb-12"
+          initial={{ opacity: 0, y: 30 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.8 }}
         >
-          <button
-            onClick={() => setAmbulancePopup({ active: false, message: '' })}
-            className="absolute top-2 right-2 p-1 rounded-full hover:bg-red-700 transition"
+          <h1 className="text-6xl md:text-7xl font-bold mb-6 bg-gradient-to-r from-amber-600 via-orange-500 to-yellow-600 bg-clip-text text-transparent font-serif leading-tight">
+            Lanezy Dashboard
+          </h1>
+          <div className="w-24 h-1 bg-gradient-to-r from-amber-500 to-orange-500 rounded-full mx-auto mb-8"></div>
+          <motion.p
+            className="text-xl md:text-2xl max-w-3xl mx-auto text-gray-600 leading-relaxed font-light"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.4, duration: 0.8 }}
           >
-            <X className="w-5 h-5" />
-          </button>
-          <div className="text-2xl font-bold mb-3">🚨 EMERGENCY OVERRIDE! 🚨</div>
-          <p className="text-lg">{ambulancePopup.message}</p>
-          <p className="mt-2 text-sm opacity-80">System is prioritizing emergency vehicle.</p>
+            Real-time vehicle detection and traffic flow analysis using{' '}
+            <span className="font-semibold bg-gradient-to-r from-amber-600 to-orange-600 bg-clip-text text-transparent">
+              advanced YOLO computer vision technology
+            </span>
+          </motion.p>
         </motion.div>
-      )}
 
-      {!started && (
-        <>
-          <motion.button
-            onClick={startDetection}
-            className="mb-10 px-8 py-3 bg-pink-600 text-white rounded-full shadow-lg hover:bg-pink-700 transition text-lg font-semibold"
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.98 }}
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5 }}
+        {ambulancePopup.active && (
+          <motion.div
+            className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-gradient-to-r from-red-600 to-red-700 text-white p-8 rounded-2xl shadow-2xl z-50 flex flex-col items-center justify-center text-center max-w-sm w-11/12 backdrop-blur-sm border border-red-500/30"
+            initial={{ opacity: 0, scale: 0.8 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.8 }}
+            transition={{ duration: 0.3 }}
           >
-            Start Detection
-          </motion.button>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+            <motion.button
+              onClick={() => setAmbulancePopup({ active: false, message: '' })}
+              className="absolute top-3 right-3 p-2 rounded-full hover:bg-red-700/50 transition"
+              whileHover={{ scale: 1.1 }}
+              whileTap={{ scale: 0.9 }}
+            >
+              <X className="w-5 h-5" />
+            </motion.button>
+            <div className="text-2xl font-bold mb-3">🚨 EMERGENCY OVERRIDE! 🚨</div>
+            <p className="text-lg">{ambulancePopup.message}</p>
+            <p className="mt-2 text-sm opacity-80">System is prioritizing emergency vehicle.</p>
+          </motion.div>
+        )}
+
+        {!started && (
+          <>
+            <motion.button
+              onClick={startDetection}
+              className="mb-16 group px-12 py-6 rounded-2xl bg-gradient-to-r from-amber-500 via-orange-500 to-yellow-500 text-white font-semibold shadow-2xl shadow-orange-500/25 hover:shadow-orange-500/40 transition-all duration-300 border border-white/20 text-xl"
+              whileHover={{ scale: 1.05, y: -3 }}
+              whileTap={{ scale: 0.98 }}
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5 }}
+            >
+              <span className="flex items-center space-x-3">
+                <span>Start Detection</span>
+                <motion.span
+                  className="group-hover:translate-x-1 transition-transform duration-300"
+                >
+                  →
+                </motion.span>
+              </span>
+            </motion.button>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-6xl">
+              {videoFiles.map(({ file, lane }) => (
+                <motion.div 
+                  key={file} 
+                  className="flex items-center gap-6"
+                  initial={{ opacity: 0, x: -30 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ duration: 0.6, delay: videoFiles.findIndex(v => v.file === file) * 0.1 }}
+                >
+                  <motion.button
+                    className={`flex-shrink-0 w-12 h-12 rounded-full flex items-center justify-center bg-gradient-to-br from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white shadow-xl transition-all duration-200 ${breakdownLoading[lane] ? 'opacity-60 cursor-not-allowed' : ''}`}
+                    title={`Send Breakdown Alert for ${laneDetails[lane].label}`}
+                    onClick={() => handleBreakdownAlert(lane)}
+                    disabled={breakdownLoading[lane]}
+                    whileHover={{ scale: 1.1, y: -2 }}
+                    whileTap={{ scale: 0.95 }}
+                  >
+                    <AlertCircle className="w-6 h-6" />
+                  </motion.button>
+                  <LaneCard
+                    lane={lane}
+                    video={file}
+                    data={videoData[file]}
+                    light={lights[lane] || 'red'}
+                    currentGreen={currentGreen}
+                    lastGreenTime={formatLastGreenAgo(lastGreenTime)}
+                    vehicleCounts={vehicleCounts}
+                    onManualChange={handleManualChange}
+                    loading={loading[lane]}
+                    started={false}
+                  />
+                </motion.div>
+              ))}
+            </div>
+          </>
+        )}
+        
+        {started && (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-6xl">
             {videoFiles.map(({ file, lane }) => (
-              <div key={file} className="flex items-center gap-4">
-                {/* Breakdown Alert Button */}
-                <button
-                  className={`flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center bg-red-500 hover:bg-red-700 text-white shadow-lg transition-all duration-200 ${breakdownLoading[lane] ? 'opacity-60 cursor-not-allowed' : ''}`}
+              <motion.div 
+                key={file} 
+                className="flex items-center gap-6"
+                initial={{ opacity: 0, x: -30 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ duration: 0.6, delay: videoFiles.findIndex(v => v.file === file) * 0.1 }}
+              >
+                <motion.button
+                  className={`flex-shrink-0 w-12 h-12 rounded-full flex items-center justify-center bg-gradient-to-br from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white shadow-xl transition-all duration-200 ${breakdownLoading[lane] ? 'opacity-60 cursor-not-allowed' : ''}`}
                   title={`Send Breakdown Alert for ${laneDetails[lane].label}`}
                   onClick={() => handleBreakdownAlert(lane)}
                   disabled={breakdownLoading[lane]}
+                  whileHover={{ scale: 1.1, y: -2 }}
+                  whileTap={{ scale: 0.95 }}
                 >
                   <AlertCircle className="w-6 h-6" />
-                </button>
+                </motion.button>
                 <LaneCard
                   lane={lane}
                   video={file}
@@ -303,50 +475,25 @@ function Dashboard({ darkMode, toggleDarkMode, onHowItWorksClick, onHomeClick, o
                   vehicleCounts={vehicleCounts}
                   onManualChange={handleManualChange}
                   loading={loading[lane]}
-                  started={false}
-                  darkMode={darkMode}
+                  started={true}
                 />
-              </div>
+              </motion.div>
             ))}
           </div>
-        </>
-      )}
-      {started && (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-          {videoFiles.map(({ file, lane }) => (
-            <div key={file} className="flex items-center gap-4">
-              {/* Breakdown Alert Button */}
-              <button
-                className={`flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center bg-red-500 hover:bg-red-700 text-white shadow-lg transition-all duration-200 ${breakdownLoading[lane] ? 'opacity-60 cursor-not-allowed' : ''}`}
-                title={`Send Breakdown Alert for ${laneDetails[lane].label}`}
-                onClick={() => handleBreakdownAlert(lane)}
-                disabled={breakdownLoading[lane]}
-              >
-                <AlertCircle className="w-6 h-6" />
-              </button>
-              <LaneCard
-                lane={lane}
-                video={file}
-                data={videoData[file]}
-                light={lights[lane] || 'red'}
-                currentGreen={currentGreen}
-                lastGreenTime={formatLastGreenAgo(lastGreenTime)}
-                vehicleCounts={vehicleCounts}
-                onManualChange={handleManualChange}
-                loading={loading[lane]}
-                started={true}
-                darkMode={darkMode}
-              />
-            </div>
-          ))}
-        </div>
-      )}
-      {/* Breakdown Alert Message */}
-      {breakdownMsg && (
-        <div className="fixed bottom-8 left-1/2 -translate-x-1/2 bg-red-600 text-white px-6 py-3 rounded-full shadow-lg z-50 text-lg animate-bounce">
-          {breakdownMsg}
-        </div>
-      )}
+        )}
+        
+        {breakdownMsg && (
+          <motion.div
+            className="fixed bottom-8 left-1/2 -translate-x-1/2 bg-gradient-to-r from-red-600 to-red-700 text-white px-8 py-4 rounded-2xl shadow-2xl z-50 text-lg backdrop-blur-sm border border-red-500/30"
+            initial={{ opacity: 0, y: 50, scale: 0.9 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 50, scale: 0.9 }}
+            transition={{ duration: 0.3 }}
+          >
+            {breakdownMsg}
+          </motion.div>
+        )}
+      </div>
     </div>
   );
 }
