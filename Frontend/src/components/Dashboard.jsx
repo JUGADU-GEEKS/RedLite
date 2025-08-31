@@ -1,8 +1,12 @@
 import React, { useRef, useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import {
-  ArrowUp, ArrowDown, ArrowLeft, ArrowRight, Eye, X, AlertCircle, Home, BarChart3, Map, Users, HelpCircle
+  ArrowUp, ArrowDown, ArrowLeft, ArrowRight, Eye, X, AlertCircle
 } from 'lucide-react';
+import Navbar from './Navbar';
+import HowItWorks from './HowItWorks';
+import MapPage from './map';
+import Team from './team';
 
 const laneDetails = {
   north: { label: 'North Lane', icon: ArrowUp, color: 'from-blue-500 to-cyan-500' },
@@ -21,16 +25,8 @@ const videoFiles = [
 // Floating elements for background decoration
 const FloatingElement = ({ children, delay = 0, duration = 3 }) => (
   <motion.div
-    animate={{
-      y: [-10, 10, -10],
-      rotate: [-2, 2, -2],
-    }}
-    transition={{
-      duration,
-      repeat: Infinity,
-      ease: "easeInOut",
-      delay,
-    }}
+    animate={{ y: [-10, 10, -10], rotate: [-2, 2, -2] }}
+    transition={{ duration, repeat: Infinity, ease: "easeInOut", delay }}
   >
     {children}
   </motion.div>
@@ -74,7 +70,8 @@ function TrafficLight({ signal }) {
 }
 
 function LaneCard({
-  lane, video, data, light, currentGreen, lastGreenTime, vehicleCounts, onManualChange, loading, started
+  lane, video, data, light, currentGreen, lastGreenTime,
+  vehicleCounts, onManualChange, loading, started
 }) {
   let borderColor = 'border-gray-300/50';
   let borderGlow = '';
@@ -99,7 +96,9 @@ function LaneCard({
     >
       <TrafficLight signal={light} />
       <div className="flex flex-col items-start justify-start mb-4">
-        <h3 className="text-xl tracking-wide text-gray-800 font-semibold">{laneDetails[lane].label}</h3>
+        <h3 className="text-xl tracking-wide text-gray-800 font-semibold">
+          {laneDetails[lane].label}
+        </h3>
       </div>
       <div className="relative rounded-xl overflow-hidden shadow-lg">
         {started && data && data.frame ? (
@@ -148,63 +147,6 @@ function LaneCard({
     </motion.div>
   );
 }
-
-const StatsCard = ({ title, value, icon: Icon, delay = 0 }) => {
-  return (
-    <motion.div
-      className="bg-white/80 backdrop-blur-sm border-2 border-orange-200/50 rounded-2xl p-6 hover:shadow-xl hover:shadow-orange-500/10 transition-all duration-300"
-      initial={{ opacity: 0, y: 40 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.6, delay }}
-      whileHover={{ y: -5, scale: 1.05 }}
-    >
-      <div className="flex items-center justify-between mb-4">
-        <h3 className="text-sm font-medium text-gray-600">{title}</h3>
-        <span className="w-10 h-10 flex items-center justify-center rounded-full bg-gradient-to-br from-amber-500 via-orange-400 to-yellow-400 shadow-lg">
-          <Icon className="w-5 h-5 text-white" />
-        </span>
-      </div>
-      <div className="text-3xl font-bold mb-2 text-gray-900">{value}</div>
-    </motion.div>
-  );
-};
-
-// Simple Navbar component
-const Navbar = ({ onHowItWorksClick, onHomeClick, onDashboardClick, onMapClick, onTeamClick }) => (
-  <nav className="fixed top-0 left-0 right-0 z-50 bg-white/80 backdrop-blur-md border-b border-gray-200/50 shadow-lg">
-    <div className="max-w-7xl mx-auto px-6 py-4">
-      <div className="flex justify-between items-center">
-        <motion.h1 
-          className="text-2xl font-bold bg-gradient-to-r from-amber-600 to-orange-600 bg-clip-text text-transparent"
-          whileHover={{ scale: 1.05 }}
-        >
-          Lanezy
-        </motion.h1>
-        <div className="flex space-x-8">
-          {[
-            { label: 'Home', onClick: onHomeClick, icon: Home },
-            { label: 'Dashboard', onClick: onDashboardClick, icon: BarChart3 },
-            { label: 'How It Works', onClick: onHowItWorksClick, icon: HelpCircle },
-            { label: 'Map', onClick: onMapClick, icon: Map },
-            { label: 'Team', onClick: onTeamClick, icon: Users }
-          ].map(({ label, onClick, icon: Icon }) => (
-            <motion.button
-              key={label}
-              onClick={onClick}
-              className="flex items-center space-x-2 px-4 py-2 rounded-lg text-gray-700 hover:text-amber-600 hover:bg-amber-50 transition-all duration-300"
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-            >
-              <Icon className="w-4 h-4" />
-              <span>{label}</span>
-            </motion.button>
-          ))}
-        </div>
-      </div>
-    </div>
-  </nav>
-);
-
 function Dashboard({ onHowItWorksClick, onHomeClick, onDashboardClick, onMapClick, onTeamClick }) {
   const [breakdownLoading, setBreakdownLoading] = useState({});
   const [breakdownMsg, setBreakdownMsg] = useState('');

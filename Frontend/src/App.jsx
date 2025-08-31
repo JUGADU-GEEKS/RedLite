@@ -14,9 +14,9 @@ function App() {
         <div className="app">
           <Routes>
             <Route path="/" element={<Landing/>} />
-            <Route path="/dashboard" element={<Dashboard darkMode={darkMode} toggleDarkMode={toggleDarkMode} />} />
+            <Route path="/dashboard" element={<Dashboard/>} />
             <Route path="/team" element={<Team/>} />
-            <Route path="/map" element={<MapPage darkMode={darkMode} toggleDarkMode={toggleDarkMode} />} />
+            <Route path="/map" element={<MapPage/>} />
           </Routes>
         </div>
       </Router>
