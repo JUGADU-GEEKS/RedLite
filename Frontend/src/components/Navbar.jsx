@@ -77,7 +77,7 @@ const Navbar = ({ darkMode, toggleDarkMode }) => {
                         <div className="flex items-center space-x-3">
 
                             <motion.a
-                                href="https://github.com/JUGADU-GEEKS/RedLite"
+                                href="https://github.com/JUGADU-GEEKS/Lanezy.git"
                                 target="_blank"
                                 rel="noopener noreferrer"
                                 className={`p-2 rounded-lg flex items-center justify-center transition-all duration-300 hover:scale-110 ${
