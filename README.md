@@ -2,6 +2,7 @@
 
 A 4-lane intelligent traffic management system using computer vision and IoT to detect traffic density and dynamically control signal lights. Built using YOLOv5 (OpenCV), FastAPI, Node.js, React, and Arduino (Wi-Fi).
 
+Live Link : https://lanezy.vercel.app/
 ---
 
 ##  Objective
