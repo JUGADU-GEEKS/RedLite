@@ -2,10 +2,9 @@
 import React from 'react';
 import { motion } from 'framer-motion';
 import { Linkedin, Github, Users, Code, Palette } from 'lucide-react';
-import devangImg from '../assets/devang_singh.jpg';
 import dhruvImg from '../assets/dhruv_sharma.jpg';
 import kunalImg from '../assets/kunal_sharma.jpg';
-import purabImg from '../assets/purab.jpg';
+import sangyaImg from '../assets/sangya_ojha.jpg';
 import Navbar from "./Navbar";
 
 
@@ -139,18 +138,11 @@ const Team = ({ }) => {
       image: dhruvImg
     },
     {
-      name: "Devang Singh",
+      name: "Sangya Ojha",
       role: "Full Stack Developer",
-      linkedin: "https://www.linkedin.com/in/devang-singh-258476284/",
-      github: "https://github.com/devang9890",
-      image: devangImg
-    },
-    {
-      name: "Purab",
-      role: "Full Stack Developer",
-      linkedin: "https://www.linkedin.com/in/purab-nigam-48a31326b",
-      github: "https://github.com/Purabnigam123",
-      image: purabImg
+      linkedin: "https://www.linkedin.com/in/sangya-ojha-7a58a22a3/",
+      github: "https://github.com/sangya-25",
+      image: sangyaImg
     }
   ];
 
@@ -218,7 +210,7 @@ const Team = ({ }) => {
           </motion.div>
 
           {/* Enhanced Team Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 xl:grid-cols-4 gap-8 max-w-7xl mx-auto">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-3 gap-6 max-w-7xl mx-auto place-items-center">
             {teamMembers.map((member, index) => (
               <TeamMemberCard
                 key={member.name}
