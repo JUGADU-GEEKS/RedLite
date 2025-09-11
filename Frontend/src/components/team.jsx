@@ -5,6 +5,9 @@ import { Linkedin, Github, Users, Code, Palette } from 'lucide-react';
 import dhruvImg from '../assets/dhruv_sharma.jpg';
 import kunalImg from '../assets/kunal_sharma.jpg';
 import sangyaImg from '../assets/sangya_ojha.jpg';
+import anam from '../assets/anam.jpg';
+import sakshi from '../assets/sakshi.jpg';
+import devang from '../assets/devang.jpg';
 import Navbar from "./Navbar";
 
 
@@ -138,11 +141,32 @@ const Team = ({ }) => {
       image: dhruvImg
     },
     {
+      name: "Devang Singh",
+      role: "Full stack Developer",
+      linkedin: "https://www.linkedin.com/in/dhruv-sharma-331379154/",
+      github: "https://github.com/dhruv0050",
+      image: devang
+    },
+    {
       name: "Sangya Ojha",
       role: "Full Stack Developer",
       linkedin: "https://www.linkedin.com/in/sangya-ojha-7a58a22a3/",
       github: "https://github.com/sangya-25",
       image: sangyaImg
+    },
+    {
+      name: "Anamitra Bakshi",
+      role: "Full stack Developer",
+      linkedin: "https://www.linkedin.com/in/sangya-ojha-7a58a22a3/",
+      github: "https://github.com/sangya-25",
+      image: anam
+    },
+    {
+      name: "Sakshi Singh",
+      role: "Full stack Developer",
+      linkedin: "https://www.linkedin.com/in/sangya-ojha-7a58a22a3/",
+      github: "https://github.com/sangya-25",
+      image: sakshi
     }
   ];
 
