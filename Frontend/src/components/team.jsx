@@ -156,14 +156,14 @@ const Team = ({ }) => {
     },
     {
       name: "Anamitra Bakshi",
-      role: "Full stack Developer",
+      role: "Frontend Developer",
       linkedin: "https://www.linkedin.com/in/sangya-ojha-7a58a22a3/",
       github: "https://github.com/sangya-25",
       image: anam
     },
     {
       name: "Sakshi Singh",
-      role: "Full stack Developer",
+      role: "Frontend Developer",
       linkedin: "https://www.linkedin.com/in/sangya-ojha-7a58a22a3/",
       github: "https://github.com/sangya-25",
       image: sakshi
