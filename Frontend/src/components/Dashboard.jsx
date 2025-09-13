@@ -158,7 +158,136 @@ function Dashboard({ onHowItWorksClick, onHomeClick, onDashboardClick, onMapClic
   const [started, setStarted] = useState(false);
   const [loading, setLoading] = useState({});
   const [ambulancePopup, setAmbulancePopup] = useState({ active: false, message: '' });
+  const [locationStatus, setLocationStatus] = useState({ 
+    detected: false, 
+    loading: false, 
+    error: null, 
+    coordinates: null 
+  });
+  const [debugInfo, setDebugInfo] = useState({
+    lastSent: null,
+    backendResponse: null,
+    timestamp: null,
+    currentBackendCoords: null
+  });
   const wsRef = useRef(null);
+
+  const getCurrentTrafficCoords = async () => {
+    try {
+      const response = await fetch('http://localhost:8000/get_traffic_coords');
+      const result = await response.json();
+      console.log('Current traffic coordinates:', result);
+      
+      // Update debug info with current backend coordinates
+      if (result.status === 'success') {
+        setDebugInfo(prev => ({
+          ...prev,
+          currentBackendCoords: result.coordinates
+        }));
+      }
+      
+      return result;
+    } catch (error) {
+      console.error('Failed to get current traffic coordinates:', error);
+      return null;
+    }
+  };
+
+  const detectAndSendLocation = async () => {
+    setLocationStatus(prev => ({ ...prev, loading: true, error: null }));
+    
+    if (!navigator.geolocation) {
+      setLocationStatus(prev => ({ 
+        ...prev, 
+        loading: false, 
+        error: 'Geolocation is not supported by this browser.' 
+      }));
+      return;
+    }
+
+    navigator.geolocation.getCurrentPosition(
+      async (position) => {
+        const lat = position.coords.latitude;
+        const lon = position.coords.longitude;
+        
+        try {
+          // Update debug info with coordinates being sent
+          setDebugInfo({
+            lastSent: { lat, lon },
+            backendResponse: null,
+            timestamp: new Date().toLocaleTimeString()
+          });
+
+          const response = await fetch('http://localhost:8000/set_current_location', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ lat, lon })
+          });
+          
+          const result = await response.json();
+          
+          // Update debug info with backend response
+          setDebugInfo(prev => ({
+            ...prev,
+            backendResponse: result
+          }));
+          
+          if (result.status === 'success') {
+            setLocationStatus({
+              detected: true,
+              loading: false,
+              error: null,
+              coordinates: { lat, lon }
+            });
+            console.log('Location sent successfully:', result.message);
+          } else {
+            setLocationStatus(prev => ({ 
+              ...prev, 
+              loading: false, 
+              error: result.message || 'Failed to set location' 
+            }));
+          }
+        } catch (error) {
+          setDebugInfo(prev => ({
+            ...prev,
+            backendResponse: { error: error.message }
+          }));
+          setLocationStatus(prev => ({ 
+            ...prev, 
+            loading: false, 
+            error: `Failed to send location: ${error.message}` 
+          }));
+        }
+      },
+      (error) => {
+        let errorMessage = 'Error detecting location: ';
+        switch(error.code) {
+          case error.PERMISSION_DENIED:
+            errorMessage += 'Location access denied by user.';
+            break;
+          case error.POSITION_UNAVAILABLE:
+            errorMessage += 'Location information unavailable.';
+            break;
+          case error.TIMEOUT:
+            errorMessage += 'Location request timed out.';
+            break;
+          default:
+            errorMessage += 'Unknown error occurred.';
+            break;
+        }
+        setLocationStatus(prev => ({ 
+          ...prev, 
+          loading: false, 
+          error: errorMessage 
+        }));
+      },
+      {
+        enableHighAccuracy: true,
+        timeout: 10000,
+        maximumAge: 0
+      }
+    );
+  };
 
   const handleBreakdownAlert = async (lane) => {
     setBreakdownLoading(prev => ({ ...prev, [lane]: true }));
@@ -232,6 +361,12 @@ function Dashboard({ onHowItWorksClick, onHomeClick, onDashboardClick, onMapClic
   };
 
   useEffect(() => {
+    // Automatically detect and send location when component mounts
+    detectAndSendLocation();
+    
+    // Get current backend coordinates for debugging
+    getCurrentTrafficCoords();
+    
     return () => {
       if (wsRef.current) {
         wsRef.current.close();
@@ -249,6 +384,79 @@ function Dashboard({ onHowItWorksClick, onHomeClick, onDashboardClick, onMapClic
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-amber-50 via-orange-50 to-yellow-50 relative overflow-hidden">
+      {/* Debug Panel - Top Right */}
+      {debugInfo.lastSent && (
+        <motion.div
+          className="fixed top-4 right-4 z-50 bg-black/90 backdrop-blur-sm text-white p-4 rounded-lg shadow-2xl max-w-sm"
+          initial={{ opacity: 0, x: 100 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ duration: 0.5 }}
+        >
+          <div className="flex items-center justify-between mb-2">
+            <h3 className="text-sm font-bold text-green-400">🐛 Debug Info</h3>
+            <div className="flex space-x-2">
+              <button
+                onClick={getCurrentTrafficCoords}
+                className="text-blue-400 hover:text-blue-300 text-xs"
+                title="Refresh backend coordinates"
+              >
+                🔄
+              </button>
+              <button
+                onClick={() => setDebugInfo({ lastSent: null, backendResponse: null, timestamp: null, currentBackendCoords: null })}
+                className="text-gray-400 hover:text-white text-xs"
+                title="Close debug panel"
+              >
+                ✕
+              </button>
+            </div>
+          </div>
+          
+          <div className="space-y-2 text-xs">
+            <div>
+              <span className="text-gray-400">Sent at:</span>
+              <span className="ml-1 text-white">{debugInfo.timestamp}</span>
+            </div>
+            
+            <div>
+              <span className="text-gray-400">Coordinates:</span>
+              <div className="ml-1 text-white font-mono">
+                <div>Lat: {debugInfo.lastSent?.lat?.toFixed(8)}</div>
+                <div>Lon: {debugInfo.lastSent?.lon?.toFixed(8)}</div>
+              </div>
+            </div>
+            
+            {debugInfo.backendResponse && (
+              <div>
+                <span className="text-gray-400">Backend Response:</span>
+                <div className="ml-1 text-white">
+                  {debugInfo.backendResponse.status === 'success' ? (
+                    <span className="text-green-400">✅ Success</span>
+                  ) : (
+                    <span className="text-red-400">❌ Error</span>
+                  )}
+                </div>
+                {debugInfo.backendResponse.message && (
+                  <div className="ml-1 text-gray-300 text-xs mt-1">
+                    {debugInfo.backendResponse.message}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {debugInfo.currentBackendCoords && (
+              <div>
+                <span className="text-gray-400">Current Backend Coords:</span>
+                <div className="ml-1 text-white font-mono">
+                  <div>Lat: {debugInfo.currentBackendCoords.lat?.toFixed(8)}</div>
+                  <div>Lon: {debugInfo.currentBackendCoords.lon?.toFixed(8)}</div>
+                </div>
+              </div>
+            )}
+          </div>
+        </motion.div>
+      )}
+
       {/* Enhanced background elements - similar to landing */}
       <div className="absolute inset-0 overflow-hidden">
         {/* Soft gradient orbs */}
@@ -306,6 +514,7 @@ function Dashboard({ onHowItWorksClick, onHomeClick, onDashboardClick, onMapClic
             </span>
           </motion.p>
         </motion.div>
+
 
         {ambulancePopup.active && (
           <motion.div

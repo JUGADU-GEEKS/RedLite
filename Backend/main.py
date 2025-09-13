@@ -127,13 +127,50 @@ LANE_VIDEO_MAP = {
     'west': '4.mp4',
 }
 
-TRAFFIC_LIGHT_COORDS = (28.612091,77.037639)
+# Traffic light coordinates - can be updated dynamically
+TRAFFIC_LIGHT_COORDS = (28.612091, 77.037639)  # Default coordinates
 AMBULANCE_OVERRIDE_DURATION = 30  # seconds
 ambulance_override = {
     'active': False,
     'direction': None,
     'end_time': 0
 }
+
+# Configuration file for traffic light coordinates
+CONFIG_FILE = 'traffic_config.json'
+
+def load_traffic_config():
+    """Load traffic light coordinates from config file"""
+    global TRAFFIC_LIGHT_COORDS
+    try:
+        if os.path.exists(CONFIG_FILE):
+            with open(CONFIG_FILE, 'r') as f:
+                config = json.load(f)
+                TRAFFIC_LIGHT_COORDS = (config.get('lat', 28.612091), config.get('lon', 77.037639))
+                print(f"[CONFIG] Loaded traffic light coordinates: {TRAFFIC_LIGHT_COORDS}")
+        else:
+            # Create default config file
+            save_traffic_config(TRAFFIC_LIGHT_COORDS[0], TRAFFIC_LIGHT_COORDS[1])
+    except Exception as e:
+        print(f"[CONFIG] Error loading config: {e}")
+        print(f"[CONFIG] Using default coordinates: {TRAFFIC_LIGHT_COORDS}")
+
+def save_traffic_config(lat, lon):
+    """Save traffic light coordinates to config file"""
+    try:
+        config = {
+            'lat': lat,
+            'lon': lon,
+            'updated_at': time.time()
+        }
+        with open(CONFIG_FILE, 'w') as f:
+            json.dump(config, f, indent=2)
+        print(f"[CONFIG] Saved traffic light coordinates: ({lat}, {lon})")
+    except Exception as e:
+        print(f"[CONFIG] Error saving config: {e}")
+
+# Load configuration on startup
+load_traffic_config()
 
 # Haversine formula to calculate distance between two lat/long points in meters
 def haversine(lat1, lon1, lat2, lon2):
@@ -165,11 +202,101 @@ async def ambulance_override_post(request: Request):
         print(f"[AMBULANCE] Ambulance not close enough for override.")
         return {"status": "ok", "override": False}
 
+@app.post('/update_traffic_coords')
+async def update_traffic_coords(request: Request):
+    """Update traffic light coordinates"""
+    try:
+        data = await request.json()
+        lat = float(data.get('lat'))
+        lon = float(data.get('lon'))
+        
+        # Validate coordinates
+        if not (-90 <= lat <= 90) or not (-180 <= lon <= 180):
+            return JSONResponse({
+                'status': 'error', 
+                'message': 'Invalid coordinates. Latitude must be between -90 and 90, longitude between -180 and 180'
+            }, status_code=400)
+        
+        # Update global coordinates
+        global TRAFFIC_LIGHT_COORDS
+        TRAFFIC_LIGHT_COORDS = (lat, lon)
+        
+        # Save to config file
+        save_traffic_config(lat, lon)
+        
+        print(f"[CONFIG] Traffic light coordinates updated to: ({lat}, {lon})")
+        return {
+            'status': 'success',
+            'message': 'Traffic light coordinates updated successfully',
+            'coordinates': {'lat': lat, 'lon': lon}
+        }
+    except ValueError as e:
+        return JSONResponse({
+            'status': 'error',
+            'message': 'Invalid coordinate values. Please provide valid numbers.'
+        }, status_code=400)
+    except Exception as e:
+        return JSONResponse({
+            'status': 'error',
+            'message': f'Failed to update coordinates: {str(e)}'
+        }, status_code=500)
+
+@app.get('/get_traffic_coords')
+async def get_traffic_coords():
+    """Get current traffic light coordinates"""
+    return {
+        'status': 'success',
+        'coordinates': {
+            'lat': TRAFFIC_LIGHT_COORDS[0],
+            'lon': TRAFFIC_LIGHT_COORDS[1]
+        }
+    }
+
+@app.post('/set_current_location')
+async def set_current_location(request: Request):
+    """Set traffic light coordinates to current location (from browser geolocation)"""
+    try:
+        data = await request.json()
+        lat = float(data.get('lat'))
+        lon = float(data.get('lon'))
+        
+        # Validate coordinates
+        if not (-90 <= lat <= 90) or not (-180 <= lon <= 180):
+            return JSONResponse({
+                'status': 'error', 
+                'message': 'Invalid coordinates. Latitude must be between -90 and 90, longitude between -180 and 180'
+            }, status_code=400)
+        
+        # Update global coordinates
+        global TRAFFIC_LIGHT_COORDS
+        TRAFFIC_LIGHT_COORDS = (lat, lon)
+        
+        # Save to config file
+        save_traffic_config(lat, lon)
+        
+        print(f"[CONFIG] Traffic light coordinates set to current location: ({lat}, {lon})")
+        return {
+            'status': 'success',
+            'message': 'Traffic light coordinates set to your current location',
+            'coordinates': {'lat': lat, 'lon': lon}
+        }
+    except ValueError as e:
+        return JSONResponse({
+            'status': 'error',
+            'message': 'Invalid coordinate values. Please provide valid numbers.'
+        }, status_code=400)
+    except Exception as e:
+        return JSONResponse({
+            'status': 'error',
+            'message': f'Failed to set current location: {str(e)}'
+        }, status_code=500)
+  
 @app.get('/')
 def slash():
     return {
         "message": "Hi"
     }
+
 
 @app.get('/signal_status')
 def signal():
