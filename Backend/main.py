@@ -1,4 +1,3 @@
-
 ## Importing Modules
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -187,8 +186,59 @@ LANE_VIDEO_MAP = {
     'west': '4.mp4',
 }
 
-# Traffic light coordinates - can be updated dynamically
-TRAFFIC_LIGHT_COORDS = (28.612091, 77.037639)  # Default coordinates
+# --- Start of Call Alert Integration ---
+import requests
+from dotenv import load_dotenv
+load_dotenv()
+import os
+
+API_KEY = os.getenv('API_KEY')
+AGENT_ID = os.getenv('AGENT_ID')
+FROM_NUMBER_ID = os.getenv('FROM_NUMBER_ID')
+TO_NUMBER = os.getenv('TO_NUMBER')
+
+def send_call_alert(coords):
+    url = "https://backend.omnidim.io/api/v1/calls/dispatch"
+    payload = {
+        "agent_id": AGENT_ID,
+        "to_number": TO_NUMBER,
+        "from_number_id": FROM_NUMBER_ID,
+        "call_context": {
+            "message": f"Alert at coordinates: {coords}"
+        }
+    }
+    method = "POST",
+    headers = {
+        "Authorization": f"Bearer {API_KEY}",
+        "Content-Type": "application/json"
+    }
+    try:
+        response = requests.post(url, json=payload, headers=headers)
+        print(f"[CALL ALERT] Response status: {response.status_code}")
+        print(f"[CALL ALERT] Response body: {response.text}")
+        response.raise_for_status()
+        return response.json()  # Return full response for inspection
+    except Exception as e:
+        print(f"Failed to send call alert: {e}")
+        return {"error": str(e)}
+
+from fastapi import Body
+from fastapi.responses import JSONResponse
+
+@app.post('/send_call_alert')
+async def send_call_alert_endpoint(data: dict = Body(...)):
+    coords = data.get('coords')
+    if not coords:
+        return JSONResponse({'status': 'error', 'message': 'Coordinates required'}, status_code=400)
+    result = send_call_alert(coords)
+    if isinstance(result, dict) and 'error' in result:
+        return JSONResponse({'status': 'error', 'message': f"Failed to send call: {result['error']}"}, status_code=500)
+    return result
+
+# --- End of Call Alert Integration ---
+
+
+TRAFFIC_LIGHT_COORDS = (28.612091,77.037639)
 AMBULANCE_OVERRIDE_DURATION = 30  # seconds
 ambulance_override = {
     'active': False,
