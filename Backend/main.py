@@ -98,6 +98,66 @@ async def send_breakdown_alert(data: dict = Body(...)):
         return {'status': 'ok'}
     else:
         return JSONResponse({'status': 'error', 'message': 'Failed to send email'}, status_code=500)
+
+@app.post('/send_emergency_alert')
+async def send_emergency_alert(data: dict = Body(...)):
+    """Send emergency SOS alert to police station"""
+    try:
+        alert_type = data.get('type', 'emergency_sos')
+        message = data.get('message', 'EMERGENCY SOS ALERT')
+        location = data.get('location', 'Traffic intersection')
+        
+        # Use the same email infrastructure as breakdown alerts
+        # Send to all configured emergency contacts
+        from_email = 'devang9890@gmail.com'
+        app_password = 'vptx slib tbbs qdpa'
+        
+        # Load emergency contacts from data.json
+        with open('data.json', 'r') as f:
+            data_config = json.load(f)
+        
+        # Get all emergency contact emails
+        emergency_emails = data_config.get('emails', ['dhruvsh5467@gmail.com'])
+        
+        subject = f'🚨 EMERGENCY SOS ALERT - {location}'
+        body = f"""
+🚨 EMERGENCY SOS ALERT 🚨
+
+URGENT: Immediate police assistance required!
+
+Location: {location}
+Time: {time.strftime('%Y-%m-%d %H:%M:%S')}
+Message: {message}
+
+This is an automated emergency alert from the Lanezy traffic management system.
+A user has activated the emergency SOS button and requires immediate assistance.
+
+System Location: {TRAFFIC_LIGHT_COORDS[0]}, {TRAFFIC_LIGHT_COORDS[1]}
+
+PRIORITY: HIGH - Please respond immediately!
+
+---
+Lanezy Traffic Management System
+Emergency Alert System
+        """
+        
+        # Create the email message
+        msg = MIMEText(body)
+        msg['Subject'] = subject
+        msg['From'] = from_email
+        msg['To'] = ', '.join(emergency_emails)
+        
+        # Send email to all emergency contacts
+        with smtplib.SMTP_SSL('smtp.gmail.com', 465) as server:
+            server.login(from_email, app_password)
+            server.sendmail(from_email, emergency_emails, msg.as_string())
+        
+        print(f'[EMERGENCY] SOS alert sent to {len(emergency_emails)} emergency contacts: {emergency_emails}')
+        return {'status': 'success', 'message': 'Emergency alert sent successfully to all emergency contacts'}
+        
+    except Exception as e:
+        print(f'[EMERGENCY] Failed to send SOS alert: {e}')
+        return JSONResponse({'status': 'error', 'message': f'Failed to send emergency alert: {str(e)}'}, status_code=500)
 lights = {
     "north": "red",
     "south": "red",

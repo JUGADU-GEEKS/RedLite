@@ -1,7 +1,7 @@
 import React, { useRef, useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import {
-  ArrowUp, ArrowDown, ArrowLeft, ArrowRight, Eye, X, AlertCircle
+  ArrowUp, ArrowDown, ArrowLeft, ArrowRight, Eye, X
 } from 'lucide-react';
 import Navbar from './Navbar';
 import HowItWorks from './HowItWorks';
@@ -52,7 +52,7 @@ function TrafficLight({ signal }) {
   };
   const colors = colorMap[signal] || ['gray', 'gray', 'gray'];
   return (
-    <div className="absolute -top-4 -left-12 z-20">
+    <div className="absolute -top-6 -left-16 z-20">
       <div className="bg-gradient-to-b from-gray-600 to-gray-800 border-2 border-gray-300/50 rounded-xl px-2 py-3 flex flex-col items-center gap-2.5 shadow-xl">
         {[0, 1, 2].map(i => {
           const color = colors[i];
@@ -88,7 +88,7 @@ function LaneCard({
 
   return (
     <motion.div
-      className={`relative w-full max-w-md h-auto bg-white/80 backdrop-blur-sm border-[3px] ${borderColor} ${borderGlow} rounded-2xl pl-6 pr-6 pt-4 pb-4 shadow-xl overflow-visible transition-all duration-500 hover:shadow-2xl hover:bg-white/90`}
+      className={`relative w-full max-w-md h-auto bg-white/80 backdrop-blur-sm border-[3px] ${borderColor} ${borderGlow} rounded-2xl pl-8 pr-6 pt-6 pb-4 shadow-xl overflow-visible transition-all duration-500 hover:shadow-2xl hover:bg-white/90`}
       initial={{ opacity: 0, y: 40 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.6 }}
@@ -148,8 +148,6 @@ function LaneCard({
   );
 }
 function Dashboard({ onHowItWorksClick, onHomeClick, onDashboardClick, onMapClick, onTeamClick }) {
-  const [breakdownLoading, setBreakdownLoading] = useState({});
-  const [breakdownMsg, setBreakdownMsg] = useState('');
   const [videoData, setVideoData] = useState({});
   const [lights, setLights] = useState({});
   const [currentGreen, setCurrentGreen] = useState(null);
@@ -289,27 +287,6 @@ function Dashboard({ onHowItWorksClick, onHomeClick, onDashboardClick, onMapClic
     );
   };
 
-  const handleBreakdownAlert = async (lane) => {
-    setBreakdownLoading(prev => ({ ...prev, [lane]: true }));
-    setBreakdownMsg('');
-    try {
-      const res = await fetch('http://localhost:8000/send_breakdown_alert', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ lane })
-      });
-      const data = await res.json();
-      if (data.status === 'ok') {
-        setBreakdownMsg(`Breakdown alert sent for ${laneDetails[lane].label}`);
-      } else {
-        setBreakdownMsg('Failed to send breakdown alert.');
-      }
-    } catch (e) {
-      setBreakdownMsg('Error sending breakdown alert.');
-    }
-    setTimeout(() => setBreakdownMsg(''), 3000);
-    setBreakdownLoading(prev => ({ ...prev, [lane]: false }));
-  };
 
   const startDetection = () => {
     if (wsRef.current) return;
@@ -559,25 +536,15 @@ function Dashboard({ onHowItWorksClick, onHomeClick, onDashboardClick, onMapClic
               </span>
             </motion.button>
             
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-6xl">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-12 max-w-7xl mx-auto">
               {videoFiles.map(({ file, lane }) => (
                 <motion.div 
                   key={file} 
-                  className="flex items-center gap-6"
+                  className="flex justify-center"
                   initial={{ opacity: 0, x: -30 }}
                   animate={{ opacity: 1, x: 0 }}
                   transition={{ duration: 0.6, delay: videoFiles.findIndex(v => v.file === file) * 0.1 }}
                 >
-                  <motion.button
-                    className={`flex-shrink-0 w-12 h-12 rounded-full flex items-center justify-center bg-gradient-to-br from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white shadow-xl transition-all duration-200 ${breakdownLoading[lane] ? 'opacity-60 cursor-not-allowed' : ''}`}
-                    title={`Send Breakdown Alert for ${laneDetails[lane].label}`}
-                    onClick={() => handleBreakdownAlert(lane)}
-                    disabled={breakdownLoading[lane]}
-                    whileHover={{ scale: 1.1, y: -2 }}
-                    whileTap={{ scale: 0.95 }}
-                  >
-                    <AlertCircle className="w-6 h-6" />
-                  </motion.button>
                   <LaneCard
                     lane={lane}
                     video={file}
@@ -597,25 +564,15 @@ function Dashboard({ onHowItWorksClick, onHomeClick, onDashboardClick, onMapClic
         )}
         
         {started && (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-6xl">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-12 max-w-7xl mx-auto">
             {videoFiles.map(({ file, lane }) => (
               <motion.div 
                 key={file} 
-                className="flex items-center gap-6"
+                className="flex justify-center"
                 initial={{ opacity: 0, x: -30 }}
                 animate={{ opacity: 1, x: 0 }}
                 transition={{ duration: 0.6, delay: videoFiles.findIndex(v => v.file === file) * 0.1 }}
               >
-                <motion.button
-                  className={`flex-shrink-0 w-12 h-12 rounded-full flex items-center justify-center bg-gradient-to-br from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white shadow-xl transition-all duration-200 ${breakdownLoading[lane] ? 'opacity-60 cursor-not-allowed' : ''}`}
-                  title={`Send Breakdown Alert for ${laneDetails[lane].label}`}
-                  onClick={() => handleBreakdownAlert(lane)}
-                  disabled={breakdownLoading[lane]}
-                  whileHover={{ scale: 1.1, y: -2 }}
-                  whileTap={{ scale: 0.95 }}
-                >
-                  <AlertCircle className="w-6 h-6" />
-                </motion.button>
                 <LaneCard
                   lane={lane}
                   video={file}
@@ -633,17 +590,6 @@ function Dashboard({ onHowItWorksClick, onHomeClick, onDashboardClick, onMapClic
           </div>
         )}
         
-        {breakdownMsg && (
-          <motion.div
-            className="fixed bottom-8 left-1/2 -translate-x-1/2 bg-gradient-to-r from-red-600 to-red-700 text-white px-8 py-4 rounded-2xl shadow-2xl z-50 text-lg backdrop-blur-sm border border-red-500/30"
-            initial={{ opacity: 0, y: 50, scale: 0.9 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 50, scale: 0.9 }}
-            transition={{ duration: 0.3 }}
-          >
-            {breakdownMsg}
-          </motion.div>
-        )}
       </div>
     </div>
   );

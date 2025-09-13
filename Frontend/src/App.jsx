@@ -5,6 +5,7 @@ import Landing from './components/landing';
 import Dashboard from './components/Dashboard';
 import Team from './components/team';
 import MapPage from './components/map';
+import SOS from './components/SOS';
 
 function App() {
   const [darkMode, setDarkMode] = useState(true);
@@ -15,6 +16,7 @@ function App() {
           <Routes>
             <Route path="/" element={<Landing/>} />
             <Route path="/dashboard" element={<Dashboard/>} />
+            <Route path="/sos" element={<SOS/>} />
             <Route path="/team" element={<Team/>} />
             <Route path="/map" element={<MapPage/>} />
           </Routes>
