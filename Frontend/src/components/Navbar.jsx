@@ -10,7 +10,7 @@ const Navbar = ({ darkMode, toggleDarkMode }) => {
     const navItems = [
         { label: 'Home', onClick: () => navigate('/') },
         { label: 'Dashboard', onClick: () => navigate('/dashboard') },
-        { label: 'Map', onClick: () => navigate('/map') },
+        //{ label: 'Map', onClick: () => navigate('/map') },
     ];
 
     return (
