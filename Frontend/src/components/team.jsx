@@ -157,15 +157,15 @@ const Team = ({ }) => {
     {
       name: "Anamitra Bakshi",
       role: "Frontend Developer",
-      linkedin: "https://www.linkedin.com/in/sangya-ojha-7a58a22a3/",
-      github: "https://github.com/sangya-25",
+      linkedin: "https://www.linkedin.com/in/anamitra-bakshi-b021bb325?utm_source=share&utm_campaign=share_via&utm_content=profile&utm_medium=android_app",
+      github: "https://github.com/anamitra-tech",
       image: anam
     },
     {
       name: "Sakshi Singh",
       role: "Frontend Developer",
-      linkedin: "https://www.linkedin.com/in/sangya-ojha-7a58a22a3/",
-      github: "https://github.com/sangya-25",
+      linkedin: "https://www.linkedin.com/in/sakshi-singh-5176b9373?utm_source=share&utm_campaign=share_via&utm_content=profile&utm_medium=android_app",
+      github: "https://github.com/sakshisingh85",
       image: sakshi
     }
   ];
