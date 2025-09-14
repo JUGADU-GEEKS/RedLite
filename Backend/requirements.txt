@@ -2,3 +2,6 @@ fastapi
 uvicorn
 dotenv
 requests
+opencv-python
+ultralytics
+omnidimension
