@@ -187,40 +187,32 @@ LANE_VIDEO_MAP = {
 }
 
 # --- Start of Call Alert Integration ---
-import requests
+
+# --- Omnidim Python SDK Integration ---
 from dotenv import load_dotenv
 load_dotenv()
-import os
+from omnidimension import Client
+
 
 API_KEY = os.getenv('API_KEY')
-AGENT_ID = os.getenv('AGENT_ID')
-FROM_NUMBER_ID = os.getenv('FROM_NUMBER_ID')
+AGENT_ID = int(os.getenv('AGENT_ID'))
+FROM_NUMBER_ID = int(os.getenv('FROM_NUMBER_ID'))
 TO_NUMBER = os.getenv('TO_NUMBER')
 
 def send_call_alert(coords):
-    url = "https://backend.omnidim.io/api/v1/calls/dispatch"
-    payload = {
-        "agent_id": AGENT_ID,
-        "to_number": TO_NUMBER,
-        "from_number_id": FROM_NUMBER_ID,
-        "call_context": {
-            "message": f"Alert at coordinates: {coords}"
-        }
-    }
-    method = "POST",
-    headers = {
-        "Authorization": f"Bearer {API_KEY}",
-        "Content-Type": "application/json"
-    }
     try:
-        response = requests.post(url, json=payload, headers=headers)
-        print(f"[CALL ALERT] Response status: {response.status_code}")
-        print(f"[CALL ALERT] Response body: {response.text}")
-        response.raise_for_status()
-        return response.json()  # Return full response for inspection
+        client = Client(API_KEY)
+        call_context = {"message": f"Alert at coordinates: {coords}"}
+        result = client.call.dispatch_call(
+            AGENT_ID,
+            TO_NUMBER,
+            call_context
+        )
+        print(f"[CALL ALERT] SDK result: {result}")
+        return {"success": True, "result": result}
     except Exception as e:
-        print(f"Failed to send call alert: {e}")
-        return {"error": str(e)}
+        print(f"Failed to send call alert via SDK: {e}")
+        return {"success": False, "error": str(e)}
 
 from fastapi import Body
 from fastapi.responses import JSONResponse
@@ -229,10 +221,10 @@ from fastapi.responses import JSONResponse
 async def send_call_alert_endpoint(data: dict = Body(...)):
     coords = data.get('coords')
     if not coords:
-        return JSONResponse({'status': 'error', 'message': 'Coordinates required'}, status_code=400)
+        return JSONResponse({'success': False, 'message': 'Coordinates required'}, status_code=400)
     result = send_call_alert(coords)
-    if isinstance(result, dict) and 'error' in result:
-        return JSONResponse({'status': 'error', 'message': f"Failed to send call: {result['error']}"}, status_code=500)
+    if not result.get('success'):
+        return JSONResponse({'success': False, 'message': f"Failed to send call: {result.get('error', 'Unknown error')}"}, status_code=500)
     return result
 
 # --- End of Call Alert Integration ---
