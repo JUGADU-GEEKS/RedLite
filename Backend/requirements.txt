@@ -5,3 +5,4 @@ requests
 opencv-python
 ultralytics
 omnidimension
+websockets

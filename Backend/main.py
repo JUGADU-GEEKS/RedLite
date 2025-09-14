@@ -193,20 +193,49 @@ from dotenv import load_dotenv
 load_dotenv()
 from omnidimension import Client
 
-
+# Load environment variables with error handling
 API_KEY = os.getenv('API_KEY')
-AGENT_ID = int(os.getenv('AGENT_ID'))
-FROM_NUMBER_ID = int(os.getenv('FROM_NUMBER_ID'))
+AGENT_ID = os.getenv('AGENT_ID')
+FROM_NUMBER_ID = os.getenv('FROM_NUMBER_ID')
 TO_NUMBER = os.getenv('TO_NUMBER')
 
+# Check if all required environment variables are present
+OMNIDIM_CONFIGURED = all([API_KEY, AGENT_ID, FROM_NUMBER_ID, TO_NUMBER])
+
+if not OMNIDIM_CONFIGURED:
+    print("[WARNING] Omnidim SDK not configured. Missing environment variables:")
+    if not API_KEY:
+        print("  - API_KEY")
+    if not AGENT_ID:
+        print("  - AGENT_ID")
+    if not FROM_NUMBER_ID:
+        print("  - FROM_NUMBER_ID")
+    if not TO_NUMBER:
+        print("  - TO_NUMBER")
+    print("  Create a .env file with these variables to enable call alerts.")
+else:
+    # Convert to appropriate types
+    try:
+        AGENT_ID = int(AGENT_ID)
+        FROM_NUMBER_ID = int(FROM_NUMBER_ID)
+        print("[INFO] Omnidim SDK configured successfully")
+    except ValueError as e:
+        print(f"[ERROR] Invalid environment variable format: {e}")
+        OMNIDIM_CONFIGURED = False
+
 def send_call_alert(coords):
+    if not OMNIDIM_CONFIGURED:
+        print("[CALL ALERT] Omnidim SDK not configured, skipping call alert")
+        return {"success": False, "error": "Omnidim SDK not configured. Please set up environment variables."}
+    
     try:
         client = Client(API_KEY)
         call_context = {"message": f"Alert at coordinates: {coords}"}
         result = client.call.dispatch_call(
-            AGENT_ID,
-            TO_NUMBER,
-            call_context
+            agent_id=AGENT_ID,
+            to_number=TO_NUMBER,
+            from_number_id=FROM_NUMBER_ID,
+            call_context=call_context
         )
         print(f"[CALL ALERT] SDK result: {result}")
         return {"success": True, "result": result}
