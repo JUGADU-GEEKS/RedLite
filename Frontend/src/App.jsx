@@ -7,6 +7,7 @@ import Team from './components/team';
 import MapPage from './components/map';
 import SOS from './components/SOS';
 import Alert from './components/Alert';
+import Issue from './components/issue';
 
 function App() {
   const [darkMode, setDarkMode] = useState(true);
@@ -21,6 +22,7 @@ function App() {
             <Route path="/team" element={<Team/>} />
             <Route path="/map" element={<MapPage/>} />
             <Route path="/emergency" element={<Alert/>} />
+            <Route path="/issue" element={<Issue/>} />
           </Routes>
         </div>
       </Router>
