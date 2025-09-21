@@ -8,7 +8,7 @@ const Navbar = ({ darkMode, toggleDarkMode }) => {
     const navigate = useNavigate();
 
     const navItems = [
-        { label: 'Home', onClick: () => navigate('/') },
+        { label: 'Home', onClick: () => navigate('/home') },
         { label: 'Dashboard', onClick: () => navigate('/dashboard') },
         { label: 'SOS', onClick: () => navigate('/sos') },
         { label: 'Report issue', onClick: () => navigate('/issue') },

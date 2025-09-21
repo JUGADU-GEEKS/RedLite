@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { AlertTriangle, Phone, Shield, Volume2 } from 'lucide-react';
+import { AlertTriangle, Phone, Shield, ArrowLeft } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import Navbar from './Navbar';
 import emer from '../assets/emer.mp4';
 
@@ -15,6 +16,7 @@ const FloatingElement = ({ children, delay = 0, duration = 3 }) => (
 );
 
 const SOS = () => {
+  const navigate = useNavigate();
   const [isActivated, setIsActivated] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [message, setMessage] = useState('');
@@ -143,6 +145,20 @@ const SOS = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-amber-50 via-orange-50 to-yellow-50 relative overflow-hidden">
+      {/* Back Button */}
+      <motion.button
+        onClick={() => navigate(-1)}
+        className="fixed top-24 left-8 z-50 flex items-center space-x-2 px-4 py-2 bg-white/60 backdrop-blur-sm rounded-xl hover:bg-white/80 transition-all duration-300 text-gray-700 font-medium shadow-lg"
+        initial={{ opacity: 0, x: -20 }}
+        animate={{ opacity: 1, x: 0 }}
+        transition={{ duration: 0.6 }}
+        whileHover={{ scale: 1.05 }}
+        whileTap={{ scale: 0.95 }}
+      >
+        <ArrowLeft className="w-4 h-4" />
+        <span>Back</span>
+      </motion.button>
+
       {/* Enhanced background elements - same as Landing.jsx and Dashboard.jsx */}
       <div className="absolute inset-0 overflow-hidden">
         {/* Soft gradient orbs */}

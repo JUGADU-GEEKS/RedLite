@@ -3,6 +3,7 @@ import { motion } from 'framer-motion';
 import {
   ArrowUp, ArrowDown, ArrowLeft, ArrowRight, Eye, X
 } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import Navbar from './Navbar';
 import HowItWorks from './HowItWorks';
 import MapPage from './map';
@@ -148,6 +149,7 @@ function LaneCard({
   );
 }
 function Dashboard({ onHowItWorksClick, onHomeClick, onDashboardClick, onMapClick, onTeamClick }) {
+  const navigate = useNavigate();
   const [videoData, setVideoData] = useState({});
   const [lights, setLights] = useState({});
   const [currentGreen, setCurrentGreen] = useState(null);
@@ -460,6 +462,20 @@ function Dashboard({ onHowItWorksClick, onHomeClick, onDashboardClick, onMapClic
       </div>
 
       <div className="relative z-10 flex flex-col items-center p-4 transition-colors duration-500" style={{ paddingTop: '5.5rem' }}>
+        {/* Back Button */}
+        <motion.button
+          onClick={() => navigate(-1)}
+          className="fixed top-24 left-8 z-50 flex items-center space-x-2 px-4 py-2 bg-white/60 backdrop-blur-sm rounded-xl hover:bg-white/80 transition-all duration-300 text-gray-700 font-medium shadow-lg"
+          initial={{ opacity: 0, x: -20 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ duration: 0.6 }}
+          whileHover={{ scale: 1.05 }}
+          whileTap={{ scale: 0.95 }}
+        >
+          <ArrowLeft className="w-4 h-4" />
+          <span>Back</span>
+        </motion.button>
+
         <Navbar 
           onHowItWorksClick={onHowItWorksClick} 
           onHomeClick={onHomeClick} 

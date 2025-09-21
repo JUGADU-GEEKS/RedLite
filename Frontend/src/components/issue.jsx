@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Upload, Image, Video, CheckCircle, AlertCircle } from 'lucide-react';
+import { Upload, Image, Video, CheckCircle, AlertCircle, ArrowLeft } from 'lucide-react';
+import Navbar from './Navbar';
+import { useNavigate } from 'react-router-dom';
 
 // Floating elements for background decoration (same as landing page)
 const FloatingElement = ({ children, delay = 0, duration = 3 }) => (
@@ -21,6 +23,7 @@ const FloatingElement = ({ children, delay = 0, duration = 3 }) => (
 );
 
 function Issue() {
+  const navigate = useNavigate();
   const [dragActive, setDragActive] = useState(false);
   const [uploadedFile, setUploadedFile] = useState(null);
   const [filePreview, setFilePreview] = useState(null);
@@ -149,7 +152,22 @@ function Issue() {
 
       {/* Main Content */}
       <div className="relative z-10 pt-20 pb-20 px-6">
-        <div className="max-w-4xl mx-auto">
+        {/* Back Button */}
+        <motion.button
+          onClick={() => navigate(-1)}
+          className="fixed top-24 left-8 z-20 flex items-center space-x-2 px-4 py-2 bg-white/60 backdrop-blur-sm rounded-xl hover:bg-white/80 transition-all duration-300 text-gray-700 font-medium shadow-lg"
+          initial={{ opacity: 0, x: -20 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ duration: 0.6 }}
+          whileHover={{ scale: 1.05 }}
+          whileTap={{ scale: 0.95 }}
+        >
+          <ArrowLeft className="w-4 h-4" />
+          <span>Back</span>
+        </motion.button>
+
+        <Navbar />
+        <div className="max-w-4xl mx-auto" style={{ paddingTop: '5.5rem' }}>
           {/* Header Section */}
           <motion.div
             className="text-center mb-16"
