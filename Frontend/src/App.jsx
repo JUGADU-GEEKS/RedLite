@@ -8,6 +8,8 @@ import MapPage from './components/map';
 import SOS from './components/SOS';
 import Alert from './components/Alert';
 import Issue from './components/issue';
+import UserWho from './components/user_who';
+import Login from './components/login';
 
 function App() {
   const [darkMode, setDarkMode] = useState(true);
@@ -16,7 +18,9 @@ function App() {
     <Router>
         <div className="app">
           <Routes>
-            <Route path="/" element={<Landing/>} />
+            <Route path="/" element={<UserWho/>} />
+            <Route path="/login" element={<Login/>} />
+            <Route path="/home" element={<Landing/>} />
             <Route path="/dashboard" element={<Dashboard/>} />
             <Route path="/sos" element={<SOS/>} />
             <Route path="/team" element={<Team/>} />
