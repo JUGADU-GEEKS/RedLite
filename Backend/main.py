@@ -272,12 +272,9 @@ def send_call_alert(coords):
     
     try:
         client = Client(API_KEY)
-        call_context = {"message": f"Alert at coordinates: {coords}"}
         result = client.call.dispatch_call(
             agent_id=AGENT_ID,
-            to_number=TO_NUMBER,
-            from_number_id=FROM_NUMBER_ID,
-            call_context=call_context
+            to_number=TO_NUMBER
         )
         print(f"[CALL ALERT] SDK result: {result}")
         return {"success": True, "result": result}

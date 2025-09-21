@@ -1,6 +1,7 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { AlertTriangle, Phone, Shield, Volume2 } from 'lucide-react';
+import { AlertTriangle, Phone, Shield, ArrowLeft } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import Navbar from './Navbar';
 import emer from '../assets/emer.mp4';
 
@@ -15,9 +16,11 @@ const FloatingElement = ({ children, delay = 0, duration = 3 }) => (
 );
 
 const SOS = () => {
+  const navigate = useNavigate();
   const [isActivated, setIsActivated] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [message, setMessage] = useState('');
+  const [coords, setCoords] = useState({ lat: null, lon: null });
   const audioRef = useRef(null);
 
   const playSirenSound = () => {
@@ -58,10 +61,44 @@ const SOS = () => {
         })
       });
       
+      // In parallel (non-blocking), send a call alert to the backend using available coordinates.
+      (async () => {
+        try {
+          let sendCoords = null;
+          if (coords && coords.lat != null) {
+            sendCoords = [coords.lat, coords.lon];
+          } else {
+            // fallback to backend configured traffic coords
+            try {
+              const r = await fetch('http://localhost:8000/get_traffic_coords');
+              if (r.ok) {
+                const jd = await r.json();
+                const c = jd.coordinates;
+                if (c && c.lat != null) sendCoords = [c.lat, c.lon];
+              }
+            } catch (e) {
+              console.warn('Failed to fetch fallback coords for call alert:', e);
+            }
+          }
+
+          if (sendCoords) {
+            await fetch('http://localhost:8000/send_call_alert', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ coords: sendCoords }),
+            });
+          } else {
+            console.warn('No coordinates available to send call alert');
+          }
+        } catch (err) {
+          console.error('Error sending call alert:', err);
+        }
+      })();
+
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
-      
+
       const result = await response.json();
       
       if (result.status === 'success') {
@@ -91,8 +128,37 @@ const SOS = () => {
     }
   };
 
+  // Capture browser geolocation on mount (optional, used for call alert)
+  useEffect(() => {
+    if (navigator && navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          setCoords({ lat: position.coords.latitude, lon: position.coords.longitude });
+        },
+        (err) => {
+          console.warn('Geolocation error (SOS):', err);
+        },
+        { enableHighAccuracy: true, timeout: 5000 }
+      );
+    }
+  }, []);
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-amber-50 via-orange-50 to-yellow-50 relative overflow-hidden">
+      {/* Back Button */}
+      <motion.button
+        onClick={() => navigate(-1)}
+        className="fixed top-24 left-8 z-50 flex items-center space-x-2 px-4 py-2 bg-white/60 backdrop-blur-sm rounded-xl hover:bg-white/80 transition-all duration-300 text-gray-700 font-medium shadow-lg"
+        initial={{ opacity: 0, x: -20 }}
+        animate={{ opacity: 1, x: 0 }}
+        transition={{ duration: 0.6 }}
+        whileHover={{ scale: 1.05 }}
+        whileTap={{ scale: 0.95 }}
+      >
+        <ArrowLeft className="w-4 h-4" />
+        <span>Back</span>
+      </motion.button>
+
       {/* Enhanced background elements - same as Landing.jsx and Dashboard.jsx */}
       <div className="absolute inset-0 overflow-hidden">
         {/* Soft gradient orbs */}
