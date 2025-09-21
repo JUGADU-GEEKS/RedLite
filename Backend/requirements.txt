@@ -6,3 +6,4 @@ opencv-python
 ultralytics
 omnidimension
 websockets
+python-multipart
