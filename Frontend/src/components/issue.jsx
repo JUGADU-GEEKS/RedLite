@@ -103,7 +103,7 @@ function Issue() {
       if (coords.lon != null) form.append('lon', String(coords.lon));
 
       // Change host/port if your backend runs elsewhere
-      const res = await fetch('http://localhost:8000/analyze_issue', {
+        const res = await fetch(`${import.meta.env.VITE_API_URL}/analyze_issue`, {
         method: 'POST',
         body: form,
       });

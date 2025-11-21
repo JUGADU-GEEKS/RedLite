@@ -7,7 +7,7 @@ function Alert() {
     // Example coordinates, replace with actual if needed
     const coords = '28.612091,77.037639';
     try {
-      const res = await fetch('http://localhost:8000/send_call_alert', {
+        const res = await fetch(`${import.meta.env.VITE_API_URL}/send_call_alert`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ coords })

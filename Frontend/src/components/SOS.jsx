@@ -51,7 +51,7 @@ const SOS = () => {
     
     try {
       // Send emergency email to police station
-      const response = await fetch('http://localhost:8000/send_emergency_alert', {
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/send_emergency_alert`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
@@ -70,7 +70,7 @@ const SOS = () => {
           } else {
             // fallback to backend configured traffic coords
             try {
-              const r = await fetch('http://localhost:8000/get_traffic_coords');
+              const r = await fetch(`${import.meta.env.VITE_API_URL}/get_traffic_coords`);
               if (r.ok) {
                 const jd = await r.json();
                 const c = jd.coordinates;
@@ -82,7 +82,7 @@ const SOS = () => {
           }
 
           if (sendCoords) {
-            await fetch('http://localhost:8000/send_call_alert', {
+            await fetch(`${import.meta.env.VITE_API_URL}/send_call_alert`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ coords: sendCoords }),

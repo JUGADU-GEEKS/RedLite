@@ -174,7 +174,7 @@ function Dashboard({ onHowItWorksClick, onHomeClick, onDashboardClick, onMapClic
 
   const getCurrentTrafficCoords = async () => {
     try {
-      const response = await fetch('http://localhost:8000/get_traffic_coords');
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/get_traffic_coords`);
       const result = await response.json();
       console.log('Current traffic coordinates:', result);
       
@@ -218,7 +218,7 @@ function Dashboard({ onHowItWorksClick, onHomeClick, onDashboardClick, onMapClic
             timestamp: new Date().toLocaleTimeString()
           });
 
-          const response = await fetch('http://localhost:8000/set_current_location', {
+            const response = await fetch(`${import.meta.env.VITE_API_URL}/set_current_location`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ lat, lon })
@@ -293,7 +293,7 @@ function Dashboard({ onHowItWorksClick, onHomeClick, onDashboardClick, onMapClic
   const startDetection = () => {
     if (wsRef.current) return;
     setStarted(true);
-    const ws = new WebSocket('ws://localhost:8000/ws/detect');
+    const ws = new WebSocket(`ws://${window.location.hostname}:8000/ws/detect`);
     wsRef.current = ws;
     ws.onmessage = (event) => {
       const data = JSON.parse(event.data);

@@ -18,6 +18,7 @@ import json
 import smtplib
 from email.mime.text import MIMEText
 from getpass import getpass
+from fastapi import Response
 from math import radians, cos, sin, asin, sqrt
 logging.getLogger("ultralytics").setLevel(logging.WARNING)
 
@@ -33,6 +34,9 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+@app.api_route("/health", methods=["GET", "HEAD"])
+def health():
+    return {"status": "ok"}
 # Variables
 
 def send_alert_email(location, alert_type='emergency'):
@@ -822,3 +826,5 @@ async def websocket_detect(websocket: WebSocket):
         for cap in caps.values():
             cap.release()
         await websocket.close()
+
+
