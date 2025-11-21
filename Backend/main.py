@@ -144,12 +144,30 @@ try:
     from routers.admin_router import router as admin_router
     from routers.protected_examples import router as protected_router
     from routers.intersection_router import router as intersection_router
+    from routers.lane_router import router as lane_router
+    from routers.ws_router import router as ws_router
     app.include_router(auth_router)
     app.include_router(admin_router)
     app.include_router(protected_router)
     app.include_router(intersection_router)
+    app.include_router(lane_router)
+    app.include_router(ws_router)
 except Exception as e:
     print(f"[ROUTERS] Skipped including auth/admin routers due to: {e}")
+
+from services.lane_service import get_lane_service
+import asyncio
+
+@app.on_event("startup")
+async def startup_event():
+    lane_service = get_lane_service()
+    asyncio.create_task(lane_service.background_loop())
+
+@app.on_event("shutdown")
+def shutdown_event():
+    lane_service = get_lane_service()
+    lane_service.release()
+
 
 @app.post('/send_breakdown_alert')
 async def send_breakdown_alert(data: dict = Body(...)):
@@ -721,6 +739,10 @@ async def websocket_detect(websocket: WebSocket):
                             counts[name] += 1
                 print(f"[DEBUG] Lane: {lane}, Detected class IDs: {detected_classes}")
                 vehicle_counts[lane] = sum(counts.values())
+                
+                # Calculate priority order based on vehicle counts
+                priority_order = sorted(vehicle_counts.keys(), key=lambda l: vehicle_counts[l], reverse=True)
+                
                 # Send cow alert if detected and not already sent
                 if cow_detected and not cow_alert_sent[lane]:
                     location = LANE_TO_LOCATION.get(lane)
@@ -742,7 +764,8 @@ async def websocket_detect(websocket: WebSocket):
                     'lights': lights,
                     'current_green': current_green,
                     'last_green_time': last_green_time,
-                    'vehicle_counts': vehicle_counts
+                    'vehicle_counts': vehicle_counts,
+                    'priority_order': priority_order
                 })
 
             # 2. Decide on light switching

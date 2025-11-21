@@ -1,3 +1,44 @@
+## PRR-MASC Subsystem
+
+This backend implements a Priority-Rank-based Regulation for Multi-Agent Systems at Crossroads (PRR-MASC) for intelligent traffic light control. The system uses vehicle density detection to dynamically adjust signal timings, aiming to reduce congestion and wait times.
+
+### Features
+
+- **Vehicle Detection**: Utilizes YOLOv8 for real-time vehicle detection from video streams. It includes a fallback to a classic OpenCV-based detector (Background Subtraction) if the YOLO model fails to load.
+- **Dynamic Ranking**: Ranks lanes based on vehicle density and an "age" factor (time since last green light) to prioritize traffic flow.
+- **Fixed Durations**: Assigns green light durations based on rank: 45s, 30s, 15s, 15s.
+- **Real-time Updates**: Broadcasts per-second updates via WebSockets, including annotated video frames, vehicle counts, and signal status.
+- **IoT Integration**: Provides a simple REST endpoint for IoT devices to poll the current signal state.
+- **Persistence**: Logs traffic cycle data to MongoDB (or a local JSON file as a fallback).
+
+### Research Reference
+
+The implementation is based on concepts from the paper: [PRR-MASC: A Priority-Rank-based Regulation for Multi-Agent Systems at Crossroads](https://arxiv.org/abs/2109.00937v2.pdf).
+
+### How to Run
+
+1.  **YOLO Model**: Ensure you have the `yolov8n.pt` model file in the `Backend/` directory, or specify the path in your `.env` file with the `MODEL_PATH` variable. If the model is not found, the system will automatically use the fallback detector.
+2.  **Video Files**: Place your video files (`north.mp4`, `south.mp4`, `east.mp4`, `west.mp4`) in the `Backend/Videos/` directory.
+3.  **Run Server**: Start the backend server as described in the main section of this README. The server will automatically start the PRR-MASC background loop.
+
+### API Endpoints
+
+-   `GET /lane/signal_state?intersectionId=<id>`: (Public) For IoT devices to poll the current state of traffic lights.
+    ```bash
+    curl "http://localhost:8000/lane/signal_state?intersectionId=INT-001"
+    ```
+-   `POST /lane/run_cycle`: (Protected: `employee`, `admin`) Manually triggers a new traffic cycle calculation.
+    ```bash
+    curl -X POST "http://localhost:8000/lane/run_cycle" -H "Authorization: Bearer <YOUR_TOKEN>"
+    ```
+-   `GET /lane/history?intersectionId=<id>&limit=<n>`: (Protected: `employee`, `admin`) Retrieves the last `n` traffic data records for an intersection.
+-   `GET /lane/current_state?intersectionId=<id>`: (Protected: `employee`, `admin`) Gets the current in-memory state of the traffic cycle.
+-   `WS /ws/lane_feed`: WebSocket endpoint for real-time updates. Connect to this endpoint to receive live data from the traffic control system.
+
+### PyTorch/Ultralytics Compatibility
+
+The system is designed to work with `ultralytics` and PyTorch. If you encounter compatibility issues, the system is designed to gracefully degrade to the OpenCV-based fallback detector, ensuring that the traffic control logic continues to function. Check the server logs on startup to see which detector is active.
+
 # Backend Auth & RBAC Layer
 
 This backend adds authentication (JWT) and role-based access control (RBAC) to the FastAPI app. It integrates cleanly with the existing features (traffic management, PRR-MASC, IoT) without altering their behavior. New routes are added under `/auth`, `/admin`, and example protected routes `/me`, `/employee/dashboard`.

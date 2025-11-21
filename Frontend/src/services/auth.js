@@ -49,4 +49,14 @@ export function logout() {
   window.location.href = "/login";
 }
 
+export function useAuth() {
+    const token = getToken();
+    const user = getUser();
+    return {
+        token,
+        user,
+        isAuthenticated: !!token,
+    };
+}
+
 // Note: For production, prefer httpOnly cookies instead of localStorage.

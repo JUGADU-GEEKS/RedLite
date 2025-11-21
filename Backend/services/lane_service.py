@@ -1,0 +1,233 @@
+import asyncio
+import logging
+from typing import Dict, List
+from fastapi import WebSocket
+
+from core.config import DEFAULT_INTERSECTION_ID, LANES, YELLOW_TIME
+from models.traffic_data import TrafficData
+from models.traffic_signal_state import TrafficSignalState
+from utils.yolo_detector import VideoYOLODetector
+from utils.prr_masc import prr_cycle_fixed
+from motor.motor_asyncio import AsyncIOMotorClient
+import json
+import os
+from datetime import datetime
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+class PersistenceManager:
+    def __init__(self, mongo_url: str):
+        self.use_mongo = bool(mongo_url)
+        if self.use_mongo:
+            self.client = AsyncIOMotorClient(mongo_url)
+            self.db = self.client.lanezy
+            self.traffic_data_collection = self.db.traffic_data
+            self.traffic_signal_state_collection = self.db.traffic_signal_state
+            logger.info("MongoDB connection established.")
+        else:
+            self.data_dir = "Backend/data"
+            os.makedirs(self.data_dir, exist_ok=True)
+            self.traffic_data_file = os.path.join(self.data_dir, "traffic_data.json")
+            self.traffic_signal_state_file = os.path.join(self.data_dir, "traffic_signal_state.json")
+            logger.info("Using file-based persistence.")
+
+    async def save_traffic_data(self, data: TrafficData):
+        if self.use_mongo:
+            await self.traffic_data_collection.insert_one(data.dict(by_alias=True, exclude_none=True))
+        else:
+            with open(self.traffic_data_file, "a") as f:
+                f.write(data.json() + "\n")
+
+    async def upsert_signal_state(self, state: TrafficSignalState):
+        if self.use_mongo:
+            await self.traffic_signal_state_collection.update_one(
+                {"intersectionId": state.intersectionId},
+                {"$set": state.dict(by_alias=True, exclude_none=True)},
+                upsert=True
+            )
+        else:
+            # For file-based, we overwrite the file with the latest state
+            with open(self.traffic_signal_state_file, "w") as f:
+                f.write(state.json())
+
+    async def get_signal_state(self, intersection_id: str) -> dict:
+        if self.use_mongo:
+            state = await self.traffic_signal_state_collection.find_one({"intersectionId": intersection_id})
+            return state
+        else:
+            if os.path.exists(self.traffic_signal_state_file):
+                with open(self.traffic_signal_state_file, "r") as f:
+                    return json.load(f)
+            return None
+
+    async def get_traffic_history(self, intersection_id: str, limit: int) -> list:
+        if self.use_mongo:
+            cursor = self.traffic_data_collection.find({"intersectionId": intersection_id}).sort("timestamp", -1).limit(limit)
+            return await cursor.to_list(length=limit)
+        else:
+            if os.path.exists(self.traffic_data_file):
+                with open(self.traffic_data_file, "r") as f:
+                    lines = f.readlines()
+                    # Get the last `limit` lines and parse them
+                    return [json.loads(line) for line in lines[-limit:]]
+            return []
+
+
+class WebSocketManager:
+    def __init__(self):
+        self.active_connections: List[WebSocket] = []
+
+    async def connect(self, websocket: WebSocket):
+        await websocket.accept()
+        self.active_connections.append(websocket)
+
+    def disconnect(self, websocket: WebSocket):
+        self.active_connections.remove(websocket)
+
+    async def broadcast(self, payload: dict):
+        for connection in self.active_connections:
+            await connection.send_json(payload)
+
+
+class LaneService:
+    def __init__(self, mongo_url: str):
+        self.detector = VideoYOLODetector(DEFAULT_INTERSECTION_ID)
+        self.ages = {lane: 0 for lane in LANES}
+        self.persistence = PersistenceManager(mongo_url)
+        self.ws_manager = WebSocketManager()
+        self.stop_event = asyncio.Event()
+        self.current_state = {}
+
+    async def run_cycle_plan(self, intersectionId: str):
+        counts, frames = self.detector.get_cycle_snapshot()
+        ages_snapshot = self.ages.copy()
+        
+        state = prr_cycle_fixed(counts, ages_snapshot)
+        
+        traffic_data = TrafficData(
+            intersectionId=intersectionId,
+            lane_counts=counts,
+            source="yolo" if self.detector.model else "fallback",
+            priority_order=state["priority_order"],
+            durations=state["durations"],
+            ages=ages_snapshot,
+        )
+        await self.persistence.save_traffic_data(traffic_data)
+        
+        initial_signal_state = TrafficSignalState(
+            intersectionId=intersectionId,
+            state={lane: "red" for lane in LANES},
+            currentLane=None,
+            remainingTime=0,
+            phase=None
+        )
+        await self.persistence.upsert_signal_state(initial_signal_state)
+        
+        self.current_state = {
+            "counts": counts,
+            "frames": frames,
+            **state
+        }
+        return self.current_state
+
+    async def background_loop(self):
+        while not self.stop_event.is_set():
+            try:
+                cycle_plan = await self.run_cycle_plan(DEFAULT_INTERSECTION_ID)
+                priority_order = cycle_plan["priority_order"]
+                durations = cycle_plan["durations"]
+                counts_snapshot = cycle_plan["counts"]
+                ages_snapshot = self.ages.copy()
+
+                for lane in priority_order:
+                    # Green phase
+                    for remaining in range(durations[lane], 0, -1):
+                        current_frame = self.detector.read_frame(lane)
+                        
+                        light_state = {l: "red" for l in LANES}
+                        light_state[lane] = "green"
+
+                        payload = {
+                            "phase": "green",
+                            "lane": lane,
+                            "remaining": remaining,
+                            "counts": counts_snapshot,
+                            "frames": {lane: current_frame},
+                            "priority_order": priority_order,
+                            "durations": durations,
+                            "ages": ages_snapshot,
+                            "lights": light_state
+                        }
+                        await self.ws_manager.broadcast(payload)
+                        
+                        signal_state = TrafficSignalState(
+                            intersectionId=DEFAULT_INTERSECTION_ID,
+                            state=light_state,
+                            currentLane=lane,
+                            remainingTime=remaining,
+                            phase="green"
+                        )
+                        await self.persistence.upsert_signal_state(signal_state)
+                        self.current_state.update(payload)
+                        await asyncio.sleep(1)
+
+                    # Yellow phase
+                    for remaining in range(YELLOW_TIME, 0, -1):
+                        light_state = {l: "red" for l in LANES}
+                        light_state[lane] = "yellow"
+
+                        payload = {
+                            "phase": "yellow",
+                            "lane": lane,
+                            "remaining": remaining,
+                            "counts": counts_snapshot,
+                            "frames": {lane: self.detector.read_frame(lane)},
+                             "priority_order": priority_order,
+                            "durations": durations,
+                            "ages": ages_snapshot,
+                            "lights": light_state
+                        }
+                        await self.ws_manager.broadcast(payload)
+
+                        signal_state = TrafficSignalState(
+                            intersectionId=DEFAULT_INTERSECTION_ID,
+                            state=light_state,
+                            currentLane=lane,
+                            remainingTime=remaining,
+                            phase="yellow"
+                        )
+                        await self.persistence.upsert_signal_state(signal_state)
+                        self.current_state.update(payload)
+                        await asyncio.sleep(1)
+
+                    self.ages[lane] = 0
+                
+                # Increment ages for non-serviced lanes
+                for l in LANES:
+                    if l not in priority_order:
+                        self.ages[l] += 1
+
+            except asyncio.CancelledError:
+                logger.info("Background loop cancelled.")
+                break
+            except Exception as e:
+                logger.error(f"Error in background loop: {e}", exc_info=True)
+                await asyncio.sleep(5) # Wait before retrying
+
+    async def manual_trigger(self, intersectionId: str):
+        return await self.run_cycle_plan(intersectionId)
+
+    def release(self):
+        self.detector.release()
+        self.stop_event.set()
+        logger.info("LaneService released resources.")
+
+_lane_service_instance = None
+
+def get_lane_service(mongo_url: str = None) -> LaneService:
+    global _lane_service_instance
+    if _lane_service_instance is None:
+        from core.config import MONGO_URL
+        _lane_service_instance = LaneService(mongo_url or MONGO_URL)
+    return _lane_service_instance

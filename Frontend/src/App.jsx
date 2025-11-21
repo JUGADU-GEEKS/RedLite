@@ -15,6 +15,7 @@ import SignupPage from './pages/Signup';
 import AdminAssign from './pages/AdminAssign';
 import IntersectionsAdmin from './pages/IntersectionsAdmin';
 import MyIntersections from './pages/MyIntersections';
+import LaneDashboard from './pages/LaneDashboard';
 
 function App() {
   const [darkMode, setDarkMode] = useState(true);
@@ -29,6 +30,7 @@ function App() {
             <Route path="/home" element={<Landing/>} />
             <Route path="/dashboard" element={<ProtectedRoute roles={["employee","admin"]}><Dashboard/></ProtectedRoute>} />
             <Route path="/dashboard/:intersectionId" element={<ProtectedRoute roles={["employee","admin"]}><Dashboard/></ProtectedRoute>} />
+            <Route path="/lane-dashboard" element={<ProtectedRoute roles={["employee","admin"]}><LaneDashboard/></ProtectedRoute>} />
             <Route path="/sos" element={<SOS/>} />
             <Route path="/team" element={<Team/>} />
             <Route path="/map" element={<MapPage/>} />

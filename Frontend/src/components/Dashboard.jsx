@@ -155,6 +155,7 @@ function Dashboard({ onHowItWorksClick, onHomeClick, onDashboardClick, onMapClic
   const [currentGreen, setCurrentGreen] = useState(null);
   const [lastGreenTime, setLastGreenTime] = useState(null);
   const [vehicleCounts, setVehicleCounts] = useState({});
+  const [priorityOrder, setPriorityOrder] = useState([]);
   const [started, setStarted] = useState(false);
   const [loading, setLoading] = useState({});
   const [ambulancePopup, setAmbulancePopup] = useState({ active: false, message: '' });
@@ -312,6 +313,7 @@ function Dashboard({ onHowItWorksClick, onHomeClick, onDashboardClick, onMapClic
       if (data.current_green) setCurrentGreen(data.current_green);
       if (data.last_green_time) setLastGreenTime(data.last_green_time);
       if (data.vehicle_counts) setVehicleCounts(data.vehicle_counts);
+      if (data.priority_order) setPriorityOrder(data.priority_order);
 
       if (data.override_active) {
         setAmbulancePopup({
@@ -506,6 +508,27 @@ function Dashboard({ onHowItWorksClick, onHomeClick, onDashboardClick, onMapClic
               advanced YOLO computer vision technology
             </span>
           </motion.p>
+
+          {started && priorityOrder.length > 0 && (
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="mt-6 inline-flex items-center justify-center space-x-3 text-gray-600 bg-white/60 backdrop-blur-md py-2.5 px-8 rounded-full shadow-sm border border-white/60"
+            >
+              <span className="font-bold text-amber-600 uppercase text-xs tracking-widest">Priority Order</span>
+              <div className="h-4 w-px bg-gray-300"></div>
+              <div className="flex items-center space-x-2 text-sm font-medium">
+                {priorityOrder.map((lane, index) => (
+                  <React.Fragment key={lane}>
+                    <span className="capitalize text-gray-800">{lane}</span>
+                    {index < priorityOrder.length - 1 && (
+                      <span className="text-gray-400">→</span>
+                    )}
+                  </React.Fragment>
+                ))}
+              </div>
+            </motion.div>
+          )}
         </motion.div>
 
 
