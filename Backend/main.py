@@ -22,10 +22,6 @@ from fastapi import Response
 from math import radians, cos, sin, asin, sqrt
 logging.getLogger("ultralytics").setLevel(logging.WARNING)
 
-# PRR-MASC Imports
-from services.lane_service import lane_service
-from routers.lane_router import router as lane_router
-from routers.ws_router import router as ws_router
 
 # Initialising Apps
 app = FastAPI()
@@ -152,20 +148,8 @@ try:
     app.include_router(admin_router)
     app.include_router(protected_router)
     app.include_router(intersection_router)
-    # PRR-MASC Routers
-    app.include_router(lane_router)
-    app.include_router(ws_router)
 except Exception as e:
     print(f"[ROUTERS] Skipped including auth/admin routers due to: {e}")
-
-@app.on_event("startup")
-async def startup_event():
-    # Start LaneService background loop
-    asyncio.create_task(lane_service.background_loop())
-
-@app.on_event("shutdown")
-async def shutdown_event():
-    lane_service.release()
 
 @app.post('/send_breakdown_alert')
 async def send_breakdown_alert(data: dict = Body(...)):
