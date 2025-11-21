@@ -9,7 +9,13 @@ import SOS from './components/SOS';
 import Alert from './components/Alert';
 import Issue from './components/issue';
 import UserWho from './components/user_who';
-import Login from './components/login';
+import ProtectedRoute from './components/ProtectedRoute';
+import LoginPage from './pages/Login';
+import SignupPage from './pages/Signup';
+import AdminAssign from './pages/AdminAssign';
+import IntersectionsAdmin from './pages/IntersectionsAdmin';
+import MyIntersections from './pages/MyIntersections';
+import LaneDashboard from './pages/LaneDashboard';
 
 function App() {
   const [darkMode, setDarkMode] = useState(true);
@@ -19,14 +25,22 @@ function App() {
         <div className="app">
           <Routes>
             <Route path="/" element={<UserWho/>} />
-            <Route path="/login" element={<Login/>} />
+            <Route path="/login" element={<LoginPage/>} />
+            <Route path="/signup" element={<SignupPage/>} />
             <Route path="/home" element={<Landing/>} />
-            <Route path="/dashboard" element={<Dashboard/>} />
+            <Route path="/dashboard" element={<ProtectedRoute roles={["employee","admin"]}><Dashboard/></ProtectedRoute>} />
+            <Route path="/dashboard/:intersectionId" element={<ProtectedRoute roles={["employee","admin"]}><Dashboard/></ProtectedRoute>} />
             <Route path="/sos" element={<SOS/>} />
             <Route path="/team" element={<Team/>} />
             <Route path="/map" element={<MapPage/>} />
             <Route path="/emergency" element={<Alert/>} />
             <Route path="/issue" element={<Issue/>} />
+            <Route path="/admin" element={<ProtectedRoute roles={["admin"]}><AdminAssign/></ProtectedRoute>} />
+            <Route path="/admin/intersections" element={<ProtectedRoute roles={["admin"]}><IntersectionsAdmin/></ProtectedRoute>} />
+            <Route path="/my-intersections" element={<ProtectedRoute roles={["employee"]}><MyIntersections/></ProtectedRoute>} />
+            <Route path="/lane-dashboard" element={<ProtectedRoute roles={["employee","admin"]}><LaneDashboard/></ProtectedRoute>} />
+            <Route path="/lane-dashboard/:intersectionId" element={<ProtectedRoute roles={["employee","admin"]}><LaneDashboard/></ProtectedRoute>} />
+            <Route path="/unauthorized" element={<div style={{padding:'2rem'}}>Unauthorized</div>} />
           </Routes>
         </div>
       </Router>

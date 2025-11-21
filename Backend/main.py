@@ -22,13 +22,23 @@ from fastapi import Response
 from math import radians, cos, sin, asin, sqrt
 logging.getLogger("ultralytics").setLevel(logging.WARNING)
 
+# PRR-MASC Imports
+from services.lane_service import lane_service
+from routers.lane_router import router as lane_router
+from routers.ws_router import router as ws_router
 
 # Initialising Apps
 app = FastAPI()
-# Enable CORS for all origins (for development)
+# Enable CORS using frontend origin if provided, else allow all (dev)
+try:
+    from core.config import FRONTEND_ORIGIN
+    allow_origins = [FRONTEND_ORIGIN] if FRONTEND_ORIGIN else ["*"]
+except Exception:
+    allow_origins = ["*"]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=allow_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -131,6 +141,31 @@ LANE_TO_LOCATION = {
 # API endpoint to send breakdown alert
 from fastapi import Body
 from fastapi.responses import JSONResponse
+
+# Include auth/admin routers
+try:
+    from routers.auth_router import router as auth_router
+    from routers.admin_router import router as admin_router
+    from routers.protected_examples import router as protected_router
+    from routers.intersection_router import router as intersection_router
+    app.include_router(auth_router)
+    app.include_router(admin_router)
+    app.include_router(protected_router)
+    app.include_router(intersection_router)
+    # PRR-MASC Routers
+    app.include_router(lane_router)
+    app.include_router(ws_router)
+except Exception as e:
+    print(f"[ROUTERS] Skipped including auth/admin routers due to: {e}")
+
+@app.on_event("startup")
+async def startup_event():
+    # Start LaneService background loop
+    asyncio.create_task(lane_service.background_loop())
+
+@app.on_event("shutdown")
+async def shutdown_event():
+    lane_service.release()
 
 @app.post('/send_breakdown_alert')
 async def send_breakdown_alert(data: dict = Body(...)):

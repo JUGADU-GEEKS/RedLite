@@ -7,13 +7,41 @@ const Navbar = ({ darkMode, toggleDarkMode }) => {
     const [isMenuOpen, setIsMenuOpen] = useState(false);
     const navigate = useNavigate();
 
-    const navItems = [
-        { label: 'Home', onClick: () => navigate('/home') },
-        { label: 'Dashboard', onClick: () => navigate('/dashboard') },
-        { label: 'SOS', onClick: () => navigate('/sos') },
-        { label: 'Report issue', onClick: () => navigate('/issue') },
-        //{ label: 'Map', onClick: () => navigate('/map') },
-    ];
+    const userRaw = localStorage.getItem('lanezy_user');
+    const user = userRaw ? JSON.parse(userRaw) : null;
+    const role = user?.role || 'user';
+
+    const handleLogout = () => {
+        localStorage.removeItem('lanezy_token');
+        localStorage.removeItem('lanezy_user');
+        navigate('/');
+    };
+
+    let navItems = [];
+    if (role === 'admin') {
+        navItems = [
+            { label: 'Home', onClick: () => navigate('/home') },
+            { label: 'Dashboard', onClick: () => navigate('/dashboard') },
+            { label: 'Manage Intersections', onClick: () => navigate('/admin/intersections') },
+        ];
+    } else if (role === 'employee') {
+        navItems = [
+            { label: 'Home', onClick: () => navigate('/home') },
+            { label: 'Dashboard', onClick: () => navigate('/dashboard') },
+            { label: 'My Intersections', onClick: () => navigate('/my-intersections') },
+        ];
+    } else {
+        navItems = [
+            { label: 'Home', onClick: () => navigate('/home') },
+            { label: 'SOS', onClick: () => navigate('/sos') },
+            { label: 'Report issue', onClick: () => navigate('/issue') },
+        ];
+    }
+
+    // Add Logout if user is logged in (token exists)
+    if (localStorage.getItem('lanezy_token')) {
+        navItems.push({ label: 'Logout', onClick: handleLogout });
+    }
 
     return (
         <nav className={`fixed top-0 left-0 right-0 z-50 ${
