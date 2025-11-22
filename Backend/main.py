@@ -29,6 +29,9 @@ app = FastAPI()
 try:
     from core.config import FRONTEND_ORIGIN
     allow_origins = [FRONTEND_ORIGIN] if FRONTEND_ORIGIN else ["*"]
+    # Ensure local dev frontend is allowed as well
+    if "http://localhost:5173" not in allow_origins and "*" not in allow_origins:
+        allow_origins.append("http://localhost:5173")
 except Exception:
     allow_origins = ["*"]
 

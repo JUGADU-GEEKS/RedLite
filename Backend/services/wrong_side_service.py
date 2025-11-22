@@ -11,13 +11,14 @@ from ultralytics.nn.tasks import DetectionModel
 from torch.nn import Sequential
 
 from core.config import MONGO_URL
+import certifi
 
 # Add required modules to the safe globals for torch.load
 # This is required for newer versions of PyTorch
 torch.serialization.add_safe_globals([DetectionModel, Sequential])
 
-# Initialize MongoDB client
-client = AsyncIOMotorClient(MONGO_URL)
+# Initialize MongoDB client (use certifi CA bundle for TLS verification)
+client = AsyncIOMotorClient(MONGO_URL, tlsCAFile=certifi.where())
 db_name = os.getenv("MONGODB_NAME", "lanezy")
 db = client[db_name]
 collection = db["wrong_side"]
@@ -106,8 +107,14 @@ class WrongSideService:
                                 # Add explicit date and time fields if needed, but timestamp covers both.
                                 # The user asked for "timestamp (the time they were captured) and the date".
                                 # datetime object in MongoDB stores both.
-                                await collection.insert_one(entry_dict)
-                                print(f"Saved plate {plate_number} to database.") # Debug print
+                                try:
+                                    await collection.insert_one(entry_dict)
+                                    print(f"Saved plate {plate_number} to database.") # Debug print
+                                except Exception as db_err:
+                                    # Log the DB error and continue processing so a DB outage
+                                    # doesn't cause the whole request to fail.
+                                    print(f"Warning: failed to save plate to DB: {db_err}")
+                                
                                 detected_plates.append(plate_number)
                                 # Break after finding one plate for this vehicle to avoid duplicates from same frame
                                 break
