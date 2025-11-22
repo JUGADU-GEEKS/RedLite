@@ -7,7 +7,12 @@ from passlib.context import CryptContext
 from core.config import SECRET_KEY, ALGORITHM
 
 
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+# Configure bcrypt with explicit settings to avoid compatibility issues
+pwd_context = CryptContext(
+    schemes=["bcrypt"],
+    deprecated="auto",
+    bcrypt__rounds=12,  # Standard number of rounds
+)
 
 
 def hash_password(plain: str) -> str:

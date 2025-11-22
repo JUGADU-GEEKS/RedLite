@@ -152,8 +152,15 @@ try:
     app.include_router(intersection_router)
     app.include_router(lane_router)
     app.include_router(ws_router)
+    logging.info("[ROUTERS] Successfully included all routers")
+    # Verify auth routes are registered
+    routes = [r.path for r in app.routes]
+    auth_routes = [r for r in routes if '/auth' in r]
+    logging.info(f"[ROUTERS] Registered auth routes: {auth_routes}")
 except Exception as e:
-    print(f"[ROUTERS] Skipped including auth/admin routers due to: {e}")
+    logging.error(f"[ROUTERS] Failed to include routers: {e}", exc_info=True)
+    import traceback
+    traceback.print_exc()
 
 from services.lane_service import get_lane_service
 import asyncio
