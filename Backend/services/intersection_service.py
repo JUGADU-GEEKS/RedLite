@@ -1,11 +1,13 @@
 from fastapi import HTTPException
 from pymongo import MongoClient
+import certifi
 from bson import ObjectId
 import time
 from core.config import MONGO_URL
 from models.intersections import IntersectionModel
 
-client = MongoClient(MONGO_URL)
+# Use certifi CA bundle to ensure TLS certs validate correctly on macOS/local dev
+client = MongoClient(MONGO_URL, tlsCAFile=certifi.where())
 # Get database name from connection string or default to 'lanezy'
 try:
     db_name = client.get_database().name

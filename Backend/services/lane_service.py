@@ -9,6 +9,7 @@ from models.traffic_signal_state import TrafficSignalState
 from utils.yolo_detector import VideoYOLODetector
 from utils.prr_masc import prr_cycle_fixed
 from motor.motor_asyncio import AsyncIOMotorClient
+import certifi
 import json
 import os
 from datetime import datetime
@@ -20,7 +21,8 @@ class PersistenceManager:
     def __init__(self, mongo_url: str):
         self.use_mongo = bool(mongo_url)
         if self.use_mongo:
-            self.client = AsyncIOMotorClient(mongo_url)
+            # Use certifi CA bundle so TLS certificate verification succeeds (helps on macOS)
+            self.client = AsyncIOMotorClient(mongo_url, tlsCAFile=certifi.where())
             self.db = self.client.lanezy
             self.traffic_data_collection = self.db.traffic_data
             self.traffic_signal_state_collection = self.db.traffic_signal_state

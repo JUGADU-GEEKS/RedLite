@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, Query, Path
 from typing import List
 from services.lane_service import get_lane_service, LaneService
+import logging
 from deps.auth_deps import require_role
 from models.user import User
 from core.config import DEFAULT_INTERSECTION_ID
@@ -36,42 +37,65 @@ async def get_signal_status(
     - With hyphen (INT001 -> INT-001)
     - Without hyphen (INT-001 -> INT001)
     """
-    # Try original ID first
-    state = await lane_service.persistence.get_signal_state(intersectionId)
-    
-    # If not found, try normalized versions
-    if not state:
-        # Try adding hyphen: INT001 -> INT-001
-        if not '-' in intersectionId and len(intersectionId) >= 3:
-            normalized_id = f"{intersectionId[:3]}-{intersectionId[3:]}"
-            state = await lane_service.persistence.get_signal_state(normalized_id)
-        
-        # Try removing hyphen: INT-001 -> INT001
-        if not state and '-' in intersectionId:
-            normalized_id = intersectionId.replace('-', '')
-            state = await lane_service.persistence.get_signal_state(normalized_id)
-    
-    # If still not found, return current state from lane service if it matches
-    if not state and lane_service.current_state:
-        current_intersection_id = lane_service.current_state.get("intersectionId")
-        if current_intersection_id == intersectionId or \
-           current_intersection_id == intersectionId.replace('-', '') or \
-           current_intersection_id == f"{intersectionId[:3]}-{intersectionId[3:]}" if len(intersectionId) >= 3 else None:
-            # Return a constructed state from current_state
-            return {
-                "intersectionId": intersectionId,
-                "state": lane_service.current_state.get("lights", {}),
-                "currentLane": lane_service.current_state.get("lane"),
-                "remainingTime": lane_service.current_state.get("remaining", 0),
-                "phase": lane_service.current_state.get("phase", "red")
-            }
-    
-    if not state:
+    # Attempt to read from persistence (DB or file) but be resilient to DB errors
+    state = None
+    try:
+        # Try original ID first
+        state = await lane_service.persistence.get_signal_state(intersectionId)
+
+        # If not found, try normalized versions
+        if not state:
+            # Try adding hyphen: INT001 -> INT-001
+            if '-' not in intersectionId and len(intersectionId) >= 3:
+                normalized_id = f"{intersectionId[:3]}-{intersectionId[3:]}"
+                state = await lane_service.persistence.get_signal_state(normalized_id)
+
+            # Try removing hyphen: INT-001 -> INT001
+            if not state and '-' in intersectionId:
+                normalized_id = intersectionId.replace('-', '')
+                state = await lane_service.persistence.get_signal_state(normalized_id)
+    except Exception as e:
+        logging.exception("Error reading signal state from persistence, falling back to in-memory state")
+
+    # Build a merged response using persistence state (if any) and in-memory current_state for timings/details
+    response = {}
+    if state:
+        # persistence state is expected to be a dict-like object from DB/file
+        response.update({
+            "intersectionId": state.get("intersectionId", intersectionId),
+            "state": state.get("state", {}),
+            "currentLane": state.get("currentLane"),
+            "remainingTime": state.get("remainingTime"),
+            "phase": state.get("phase"),
+        })
+
+    # Merge in-memory information (durations, priority_order, ages, counts, live remaining/phase if present)
+    cs = lane_service.current_state or {}
+    # current_state may store timings under different keys depending on where it was set
+    # prefer live values from current_state when available
+    response.setdefault("intersectionId", cs.get("intersectionId", intersectionId))
+    response["state"] = cs.get("lights", response.get("state", {}))
+    response["currentLane"] = cs.get("lane", response.get("currentLane"))
+    response["remainingTime"] = cs.get("remaining", response.get("remainingTime", 0))
+    response["phase"] = cs.get("phase", response.get("phase", "red"))
+    # Add cycle metadata if present
+    if cs.get("durations"):
+        response["durations"] = cs.get("durations")
+    if cs.get("priority_order"):
+        response["priority_order"] = cs.get("priority_order")
+    if cs.get("ages"):
+        response["ages"] = cs.get("ages")
+    if cs.get("counts"):
+        response["counts"] = cs.get("counts")
+
+    # If we don't have any useful data, return 404
+    if not response.get("state") and not cs:
         raise HTTPException(
-            status_code=404, 
-            detail=f"Signal state not found for intersection {intersectionId}. Available intersections may use different ID formats."
+            status_code=404,
+            detail=f"Signal state not found for intersection {intersectionId}."
         )
-    return state
+
+    return response
 
 @router.post("/lane/run_cycle")
 async def run_cycle(

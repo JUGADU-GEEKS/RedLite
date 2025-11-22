@@ -1,11 +1,12 @@
 
 from pymongo import MongoClient
+import certifi
 import os
 
 # Use the connection string from your config or environment
 MONGO_URL = "mongodb+srv://dhruvsh5467:5aq9GQKwrwvJszSL@book-store.tmdjw.mongodb.net/lanezy?appName=Book-Store"
 
-client = MongoClient(MONGO_URL)
+client = MongoClient(MONGO_URL, tlsCAFile=certifi.where())
 db = client["lanezy"]
 intersections = db["intersections"]
 users = db["users"]

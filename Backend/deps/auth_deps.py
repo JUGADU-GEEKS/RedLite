@@ -5,6 +5,7 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from motor.motor_asyncio import AsyncIOMotorClient, AsyncIOMotorDatabase
 
 from core.config import MONGO_URL
+import certifi
 from services.auth_service import decode_access_token
 
 
@@ -16,7 +17,8 @@ async def get_db() -> AsyncIOMotorDatabase:
     if _client is None:
         if not MONGO_URL:
             raise RuntimeError("MONGO_URL/MONGODB_URI not configured")
-        _client = AsyncIOMotorClient(MONGO_URL)
+        # Use certifi CA bundle so TLS certificate verification succeeds (helps on macOS)
+        _client = AsyncIOMotorClient(MONGO_URL, tlsCAFile=certifi.where())
     # Database name from URL or default 'lanezy'
     default_db = _client.get_default_database()
     db_name = default_db.name if default_db is not None else "lanezy"

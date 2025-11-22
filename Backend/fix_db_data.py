@@ -1,10 +1,12 @@
 from pymongo import MongoClient
+import certifi
 import datetime
 import time
 
 MONGO_URL = "mongodb+srv://dhruvsh5467:5aq9GQKwrwvJszSL@book-store.tmdjw.mongodb.net/lanezy?appName=Book-Store"
 
-client = MongoClient(MONGO_URL)
+# Use certifi CA bundle so that TLS certificate verification succeeds
+client = MongoClient(MONGO_URL, tlsCAFile=certifi.where())
 db = client["lanezy"]
 intersections = db["intersections"]
 
