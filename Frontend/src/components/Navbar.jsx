@@ -29,6 +29,7 @@ const Navbar = ({ darkMode, toggleDarkMode }) => {
             { label: 'Home', onClick: () => navigate('/home') },
             { label: 'Dashboard', onClick: () => navigate('/dashboard') },
             { label: 'My Intersections', onClick: () => navigate('/my-intersections') },
+            { label: 'Wrong Side', onClick: () => navigate('/wrong-side') },
         ];
     } else {
         navItems = [

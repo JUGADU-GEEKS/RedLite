@@ -146,12 +146,14 @@ try:
     from routers.intersection_router import router as intersection_router
     from routers.lane_router import router as lane_router
     from routers.ws_router import router as ws_router
+    from routers.wrong_side_router import router as wrong_side_router
     app.include_router(auth_router)
     app.include_router(admin_router)
     app.include_router(protected_router)
     app.include_router(intersection_router)
     app.include_router(lane_router)
     app.include_router(ws_router)
+    app.include_router(wrong_side_router)
     logging.info("[ROUTERS] Successfully included all routers")
     # Verify auth routes are registered
     routes = [r.path for r in app.routes]
