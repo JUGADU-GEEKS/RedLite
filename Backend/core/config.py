@@ -32,7 +32,9 @@ def get_access_token_expires() -> timedelta:
 # PRR-MASC specific settings
 # This implementation is based on the research paper: https://arxiv.org/abs/2109.00937
 MODEL_PATH = os.getenv("MODEL_PATH", "yolov8n.pt")
-VIDEOS_DIR = os.getenv("VIDEOS_DIR", "Backend/Videos")
+# Resolve VIDEOS_DIR relative to this file's location (core/config.py -> Backend/Videos)
+_BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))  # Backend directory
+VIDEOS_DIR = os.getenv("VIDEOS_DIR", os.path.join(_BASE_DIR, "Videos"))
 LANES = ["north", "south", "east", "west"]
 LANE_VIDEO_MAP = {
     "north": "1.mp4",

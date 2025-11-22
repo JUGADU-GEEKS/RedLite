@@ -34,10 +34,14 @@ class VideoYOLODetector:
         self.model = None
         self.fallback_detector = FallbackDetector()
 
+        logger.info(f"Initializing VideoYOLODetector for intersection {intersection_id}")
+        logger.info(f"VIDEOS_DIR: {VIDEOS_DIR}")
+        logger.info(f"VIDEOS_DIR exists: {os.path.exists(VIDEOS_DIR)}")
+
         try:
             if os.path.exists(MODEL_PATH):
                 self.model = YOLO(MODEL_PATH)
-                logger.info("YOLO model loaded successfully.")
+                logger.info(f"YOLO model loaded successfully from {MODEL_PATH}")
             else:
                 raise FileNotFoundError(f"Model not found at {MODEL_PATH}")
         except Exception as e:
@@ -51,10 +55,21 @@ class VideoYOLODetector:
                 continue
             
             video_path = os.path.join(VIDEOS_DIR, video_file)
+            # Normalize path for Windows
+            video_path = os.path.normpath(video_path)
+            logger.debug(f"Checking video path for lane '{lane}': {video_path}")
+            
             if os.path.exists(video_path):
-                self.video_captures[lane] = cv2.VideoCapture(video_path)
+                cap = cv2.VideoCapture(video_path)
+                if cap.isOpened():
+                    self.video_captures[lane] = cap
+                    logger.info(f"✓ Video for lane '{lane}' loaded successfully from {video_path}")
+                else:
+                    logger.error(f"✗ Failed to open video for lane '{lane}' at {video_path}")
             else:
-                logger.warning(f"Video for lane '{lane}' not found at {video_path}")
+                logger.error(f"✗ Video for lane '{lane}' not found at {video_path}")
+        
+        logger.info(f"Loaded {len(self.video_captures)}/{len(LANES)} video captures")
 
     def _process_frame(self, lane: str, frame):
         if self.model:
@@ -71,34 +86,59 @@ class VideoYOLODetector:
     def get_cycle_snapshot(self) -> Tuple[Dict[str, int], Dict[str, str]]:
         counts = {}
         frames_b64 = {}
+        
+        # Initialize all lanes to ensure all are present in the result
+        for lane in LANES:
+            counts[lane] = 0
+            frames_b64[lane] = ""
 
         for lane, cap in self.video_captures.items():
+            if not cap or not cap.isOpened():
+                logger.warning(f"Video capture for lane '{lane}' is not available")
+                continue
+                
             ret, frame = cap.read()
             if ret:
                 count, frame_b64 = self._process_frame(lane, frame)
                 counts[lane] = count
                 frames_b64[lane] = frame_b64
+                logger.debug(f"Lane '{lane}': detected {count} vehicles")
             else:
-                counts[lane] = 0
-                frames_b64[lane] = ""
+                # Reset to beginning if video ended
                 cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
+                ret, frame = cap.read()
+                if ret:
+                    count, frame_b64 = self._process_frame(lane, frame)
+                    counts[lane] = count
+                    frames_b64[lane] = frame_b64
+                    logger.debug(f"Lane '{lane}': detected {count} vehicles (after reset)")
+                else:
+                    logger.warning(f"Failed to read frame for lane '{lane}' even after reset")
 
+        logger.info(f"Cycle snapshot counts: {counts}")
         return counts, frames_b64
 
     def read_frame(self, lane: str) -> str:
         cap = self.video_captures.get(lane)
         if not cap:
+            logger.debug(f"No video capture for lane '{lane}'")
             return ""
 
         ret, frame = cap.read()
         if not ret:
+            # Reset to beginning if video ended
             cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
             ret, frame = cap.read()
             if not ret:
+                logger.warning(f"Failed to read frame for lane '{lane}'")
                 return ""
 
-        _, frame_b64 = self._process_frame(lane, frame)
-        return frame_b64
+        try:
+            count, frame_b64 = self._process_frame(lane, frame)
+            return frame_b64
+        except Exception as e:
+            logger.error(f"Error processing frame for lane '{lane}': {e}")
+            return ""
 
     def release(self):
         for cap in self.video_captures.values():

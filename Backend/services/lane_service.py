@@ -132,18 +132,37 @@ class LaneService:
         return self.current_state
 
     async def background_loop(self):
+        """
+        Main cycle loop implementing PRR-MASC fixed cycle logic:
+        - Priority computed ONCE per full cycle (all 4 lanes)
+        - Fixed timings: Rank 1=45s, Rank 2=30s, Rank 3=15s, Rank 4=15s, Yellow=3s
+        - Density snapshot captured once at start, used for entire cycle
+        - Ages reset to 0 for ALL lanes after each full cycle completes
+        """
         while not self.stop_event.is_set():
             try:
+                # STEP 1: Compute priority ONCE at cycle start
+                # Capture density snapshot and current ages
                 cycle_plan = await self.run_cycle_plan(DEFAULT_INTERSECTION_ID)
                 priority_order = cycle_plan["priority_order"]
                 durations = cycle_plan["durations"]
-                counts_snapshot = cycle_plan["counts"]
-                ages_snapshot = self.ages.copy()
+                counts_snapshot = cycle_plan["counts"]  # Frozen snapshot for entire cycle
+                ages_snapshot = self.ages.copy()  # Snapshot at cycle start
+                frames_snapshot = cycle_plan["frames"]  # Initial frames
 
+                logger.info(f"[CYCLE START] Priority order: {priority_order}, Durations: {durations}, Ages: {ages_snapshot}")
+
+                # STEP 2: Serve each lane in priority order (FIXED CYCLE)
                 for lane in priority_order:
-                    # Green phase
-                    for remaining in range(durations[lane], 0, -1):
-                        current_frame = self.detector.read_frame(lane)
+                    green_duration = durations[lane]
+                    
+                    # GREEN PHASE - Fixed duration based on rank
+                    for remaining in range(green_duration, 0, -1):
+                        # Continuously read frames for all lanes during green
+                        current_frames = {}
+                        for l in LANES:
+                            frame = self.detector.read_frame(l)
+                            current_frames[l] = frame if frame else ""  # Ensure all lanes have entries
                         
                         light_state = {l: "red" for l in LANES}
                         light_state[lane] = "green"
@@ -152,11 +171,11 @@ class LaneService:
                             "phase": "green",
                             "lane": lane,
                             "remaining": remaining,
-                            "counts": counts_snapshot,
-                            "frames": {lane: current_frame},
+                            "counts": counts_snapshot,  # Use frozen snapshot
+                            "frames": current_frames,  # Live frame updates for all lanes
                             "priority_order": priority_order,
                             "durations": durations,
-                            "ages": ages_snapshot,
+                            "ages": ages_snapshot,  # Use frozen snapshot
                             "lights": light_state
                         }
                         await self.ws_manager.broadcast(payload)
@@ -172,8 +191,14 @@ class LaneService:
                         self.current_state.update(payload)
                         await asyncio.sleep(1)
 
-                    # Yellow phase
+                    # YELLOW PHASE - Fixed 3 seconds
                     for remaining in range(YELLOW_TIME, 0, -1):
+                        # Continuously read frames for all lanes during yellow
+                        current_frames = {}
+                        for l in LANES:
+                            frame = self.detector.read_frame(l)
+                            current_frames[l] = frame if frame else ""  # Ensure all lanes have entries
+                        
                         light_state = {l: "red" for l in LANES}
                         light_state[lane] = "yellow"
 
@@ -181,11 +206,11 @@ class LaneService:
                             "phase": "yellow",
                             "lane": lane,
                             "remaining": remaining,
-                            "counts": counts_snapshot,
-                            "frames": {lane: self.detector.read_frame(lane)},
-                             "priority_order": priority_order,
+                            "counts": counts_snapshot,  # Use frozen snapshot
+                            "frames": current_frames,  # Live frame updates for all lanes
+                            "priority_order": priority_order,
                             "durations": durations,
-                            "ages": ages_snapshot,
+                            "ages": ages_snapshot,  # Use frozen snapshot
                             "lights": light_state
                         }
                         await self.ws_manager.broadcast(payload)
@@ -201,12 +226,33 @@ class LaneService:
                         self.current_state.update(payload)
                         await asyncio.sleep(1)
 
+                    # Set lane to RED before moving to next lane
+                    # Read frames for all lanes
+                    current_frames = {}
+                    for l in LANES:
+                        frame = self.detector.read_frame(l)
+                        current_frames[l] = frame if frame else ""  # Ensure all lanes have entries
+                    
+                    light_state = {l: "red" for l in LANES}
+                    payload = {
+                        "phase": "red",
+                        "lane": lane,
+                        "remaining": 0,
+                        "counts": counts_snapshot,
+                        "frames": current_frames,
+                        "priority_order": priority_order,
+                        "durations": durations,
+                        "ages": ages_snapshot,
+                        "lights": light_state
+                    }
+                    await self.ws_manager.broadcast(payload)
+
+                # STEP 3: After ALL 4 lanes complete, reset ages and prepare for next cycle
+                # Reset ALL ages to 0 (all lanes were served in round-robin)
+                for lane in LANES:
                     self.ages[lane] = 0
                 
-                # Increment ages for non-serviced lanes
-                for l in LANES:
-                    if l not in priority_order:
-                        self.ages[l] += 1
+                logger.info(f"[CYCLE COMPLETE] All lanes served. Ages reset. Next cycle will recalculate priority.")
 
             except asyncio.CancelledError:
                 logger.info("Background loop cancelled.")
@@ -215,8 +261,25 @@ class LaneService:
                 logger.error(f"Error in background loop: {e}", exc_info=True)
                 await asyncio.sleep(5) # Wait before retrying
 
-    async def manual_trigger(self, intersectionId: str):
-        return await self.run_cycle_plan(intersectionId)
+    async def manual_trigger(self, intersectionId: str, requested_lane: str = None):
+        """
+        Manual trigger to recalculate cycle plan.
+        If requested_lane is provided and any lane has age > 60, 
+        recalculate priority based on age.
+        """
+        if requested_lane:
+            # Check if any lane has age > 60
+            max_age = max(self.ages.values()) if self.ages else 0
+            if max_age > 60:
+                logger.info(f"[MANUAL] Age > 60 detected (max: {max_age}), recalculating priority based on age")
+                # Recalculate with current ages (will use age-based priority)
+                return await self.run_cycle_plan(intersectionId)
+            else:
+                logger.info(f"[MANUAL] Age <= 60, recalculating priority based on density")
+                # Recalculate with current state
+                return await self.run_cycle_plan(intersectionId)
+        else:
+            return await self.run_cycle_plan(intersectionId)
 
     def release(self):
         self.detector.release()

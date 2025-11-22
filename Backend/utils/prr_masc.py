@@ -6,16 +6,37 @@ def prr_cycle_fixed(density: Dict[str, int], ages_snapshot: Dict[str, int]) -> D
     """
     Calculates the priority order and durations for a traffic light cycle
     based on vehicle density and lane age.
+    
+    Priority logic:
+    - If any lane has age > 60, prioritize by age (DESC), then density (DESC)
+    - Otherwise, prioritize by density (DESC), then age (DESC) for tie-breaking
+    - Fallback order: ["north","south","east","west"]
     """
     
-    # Rank lanes based on density (desc) and age (desc) for tie-breaking
-    priority_order = sorted(
-        LANES,
-        key=lambda l: (density.get(l, 0), ages_snapshot.get(l, 0)),
-        reverse=True
-    )
+    # Check if any lane has age > 60
+    max_age = max(ages_snapshot.values()) if ages_snapshot else 0
+    age_priority_mode = max_age > 60
     
-    # Assign durations based on rank
+    if age_priority_mode:
+        # Priority by age (DESC), then density (DESC) for tie-breaking
+        priority_order = sorted(
+            LANES,
+            key=lambda l: (ages_snapshot.get(l, 0), density.get(l, 0)),
+            reverse=True
+        )
+    else:
+        # Priority by density (DESC), then age (DESC) for tie-breaking
+        priority_order = sorted(
+            LANES,
+            key=lambda l: (density.get(l, 0), ages_snapshot.get(l, 0)),
+            reverse=True
+        )
+    
+    # Fallback order if all values are equal
+    if len(set((density.get(l, 0), ages_snapshot.get(l, 0)) for l in LANES)) == 1:
+        priority_order = LANES.copy()  # Use default order
+    
+    # Assign durations based on rank (fixed timings)
     durations = {lane: DURATIONS_BY_RANK[i] for i, lane in enumerate(priority_order)}
     
     # Determine initial light states (first lane green, others red)

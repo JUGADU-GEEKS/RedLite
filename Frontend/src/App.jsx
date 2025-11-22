@@ -29,7 +29,7 @@ function App() {
             <Route path="/signup" element={<SignupPage/>} />
             <Route path="/home" element={<Landing/>} />
             <Route path="/dashboard" element={<ProtectedRoute roles={["employee","admin"]}><Dashboard/></ProtectedRoute>} />
-            <Route path="/dashboard/:intersectionId" element={<ProtectedRoute roles={["employee","admin"]}><Dashboard/></ProtectedRoute>} />
+            <Route path="/dashboard/:intersectionId" element={<ProtectedRoute roles={["employee","admin"]}><LaneDashboard/></ProtectedRoute>} />
             <Route path="/lane-dashboard" element={<ProtectedRoute roles={["employee","admin"]}><LaneDashboard/></ProtectedRoute>} />
             <Route path="/sos" element={<SOS/>} />
             <Route path="/team" element={<Team/>} />
