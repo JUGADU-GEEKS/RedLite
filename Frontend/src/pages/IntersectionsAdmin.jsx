@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { getToken } from '../services/auth';
 import Navbar from '../components/Navbar';
-import { Plus, UserPlus, Radio, MapPin, Activity } from 'lucide-react';
+import { MapPin, UserPlus, Radio, Activity, CheckCircle, AlertCircle } from 'lucide-react';
 
 const API_URL = 'http://localhost:8000';
 
@@ -11,7 +11,6 @@ const IntersectionsAdmin = () => {
     const [loading, setLoading] = useState(false);
     const [msg, setMsg] = useState({ type: '', text: '' });
 
-    // ... state for forms ...
     const [newIntersection, setNewIntersection] = useState({
         intersectionId: '',
         name: '',
@@ -21,7 +20,6 @@ const IntersectionsAdmin = () => {
     const [assignEmployee, setAssignEmployee] = useState({ intersectionId: '', employeeId: '' });
     const [registerDevice, setRegisterDevice] = useState({ intersectionId: '', iotDeviceId: '' });
 
-    // ... fetch functions ...
     const fetchIntersections = async () => {
         const token = getToken();
         try {
@@ -58,7 +56,10 @@ const IntersectionsAdmin = () => {
             if (res.ok) {
                 setMsg({ type: 'success', text: successMsg });
                 fetchIntersections();
-                // Clear forms if needed
+                setNewIntersection({ intersectionId: '', name: '', coordinates: { lat: 0, lon: 0 }, lanes: { north: '', south: '', east: '', west: '' } });
+                setAssignEmployee({ intersectionId: '', employeeId: '' });
+                setRegisterDevice({ intersectionId: '', iotDeviceId: '' });
+                setTimeout(() => setMsg({ type: '', text: '' }), 3000);
             } else {
                 const err = await res.json();
                 setMsg({ type: 'error', text: err.detail || 'Operation failed' });
@@ -70,168 +71,281 @@ const IntersectionsAdmin = () => {
         }
     };
 
+    const formInputClass = "w-full px-4 py-3 rounded-xl border border-amber-200/50 focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20 outline-none transition-all backdrop-blur-sm bg-white/80 hover:bg-white text-gray-900 placeholder-gray-500";
+    const formButtonClass = "w-full py-3 font-bold rounded-xl transition-all duration-300 shadow-lg hover:shadow-xl text-white uppercase tracking-wide";
+
     return (
-        <div className="min-h-screen bg-gray-50">
+        <div className="min-h-screen bg-gradient-to-br from-amber-50 via-orange-50 to-yellow-50 relative overflow-hidden">
+            {/* Soft gradient orbs */}
+            <div className="absolute top-10 left-10 w-96 h-96 bg-gradient-to-br from-amber-200/20 to-orange-200/20 rounded-full blur-3xl"></div>
+            <div className="absolute top-40 right-20 w-80 h-80 bg-gradient-to-br from-yellow-200/20 to-amber-200/20 rounded-full blur-3xl"></div>
+            <div className="absolute bottom-20 left-1/4 w-72 h-72 bg-gradient-to-br from-orange-200/20 to-red-200/20 rounded-full blur-3xl"></div>
+
             <Navbar />
-            <div className="pt-24 px-6 max-w-7xl mx-auto">
-                <div className="mb-8">
-                    <h1 className="text-3xl font-bold text-gray-900">Intersection Management</h1>
-                    <p className="text-gray-600 mt-2">Manage traffic intersections, assignments, and IoT devices</p>
-                </div>
+            <div className="pt-28 px-6 max-w-7xl mx-auto pb-12 relative z-10">
+                {/* Header */}
+                <motion.div 
+                    initial={{ opacity: 0, y: -20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.5 }}
+                    className="mb-12"
+                >
+                    <h1 className="text-5xl md:text-6xl font-bold mb-2 bg-gradient-to-r from-amber-600 via-orange-500 to-yellow-600 bg-clip-text text-transparent font-serif">
+                        Intersection Management
+                    </h1>
+                    <div className="w-24 h-1 bg-gradient-to-r from-amber-500 to-orange-500 rounded-full mb-4"></div>
+                    <p className="text-lg text-gray-700">
+                        🛣️ Manage traffic intersections, assignments, and IoT devices
+                    </p>
+                </motion.div>
+
+                {/* Alert Message */}
+                {msg.text && (
+                    <motion.div 
+                        initial={{ opacity: 0, y: -10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: -10 }}
+                        className={`mb-6 p-5 rounded-2xl flex items-center gap-3 backdrop-blur-sm shadow-lg border ${
+                            msg.type === 'success' 
+                                ? 'bg-gradient-to-r from-emerald-100 to-emerald-50 border-emerald-300 text-emerald-800' 
+                                : 'bg-gradient-to-r from-red-100 to-red-50 border-red-300 text-red-800'
+                        }`}
+                    >
+                        {msg.type === 'success' ? (
+                            <CheckCircle size={24} className="flex-shrink-0" />
+                        ) : (
+                            <AlertCircle size={24} className="flex-shrink-0" />
+                        )}
+                        <span className="font-semibold">{msg.text}</span>
+                    </motion.div>
+                )}
 
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                     {/* Left Column: Forms */}
-                    <div className="lg:col-span-1 space-y-8">
+                    <div className="lg:col-span-1 space-y-6">
                         {/* Create Intersection Form */}
-                        <motion.div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
-                            <div className="flex items-center gap-2 mb-4 text-amber-600">
-                                <MapPin size={20} />
-                                <h2 className="text-lg font-semibold">Create Intersection</h2>
+                        <motion.div 
+                            initial={{ opacity: 0, y: 20 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            transition={{ delay: 0.1 }}
+                            className="bg-white/60 backdrop-blur-sm p-8 rounded-3xl shadow-xl border border-white/50 hover:shadow-2xl transition-all duration-300"
+                        >
+                            <div className="flex items-center gap-3 mb-6 pb-4 border-b-2 border-amber-200/50">
+                                <div className="p-3 bg-gradient-to-br from-amber-100 to-orange-100 rounded-xl text-amber-600 shadow-md">
+                                    <MapPin size={28} />
+                                </div>
+                                <h2 className="text-xl font-bold text-gray-900">Create Intersection</h2>
                             </div>
-                            <form onSubmit={(e) => handleSubmit(e, `${API_URL}/intersections/create`, newIntersection, 'Intersection created!')} className="space-y-4">
+                            <form onSubmit={(e) => handleSubmit(e, `${API_URL}/intersections/create`, newIntersection, '✨ Intersection created successfully!')} className="space-y-4">
                                 <input 
-                                    className="w-full px-4 py-2 rounded-lg border border-gray-200 focus:ring-2 focus:ring-amber-500 outline-none"
+                                    className={formInputClass}
                                     placeholder="Intersection ID (e.g. I001)"
                                     value={newIntersection.intersectionId}
                                     onChange={e => setNewIntersection({...newIntersection, intersectionId: e.target.value})}
                                     required
                                 />
                                 <input 
-                                    className="w-full px-4 py-2 rounded-lg border border-gray-200 focus:ring-2 focus:ring-amber-500 outline-none"
+                                    className={formInputClass}
                                     placeholder="Name (e.g. Main St & 1st Ave)"
                                     value={newIntersection.name}
                                     onChange={e => setNewIntersection({...newIntersection, name: e.target.value})}
                                     required
                                 />
-                                <div className="grid grid-cols-2 gap-2">
+                                <div className="grid grid-cols-2 gap-3">
                                     <input 
                                         type="number" step="any"
-                                        className="w-full px-4 py-2 rounded-lg border border-gray-200 focus:ring-2 focus:ring-amber-500 outline-none"
+                                        className={formInputClass}
                                         placeholder="Latitude"
                                         onChange={e => setNewIntersection({...newIntersection, coordinates: {...newIntersection.coordinates, lat: parseFloat(e.target.value)}})}
                                     />
                                     <input 
                                         type="number" step="any"
-                                        className="w-full px-4 py-2 rounded-lg border border-gray-200 focus:ring-2 focus:ring-amber-500 outline-none"
+                                        className={formInputClass}
                                         placeholder="Longitude"
                                         onChange={e => setNewIntersection({...newIntersection, coordinates: {...newIntersection.coordinates, lon: parseFloat(e.target.value)}})}
                                     />
                                 </div>
-                                <button type="submit" disabled={loading} className="w-full py-2 bg-amber-500 hover:bg-amber-600 text-white rounded-lg font-medium transition-colors">
-                                    Create Intersection
-                                </button>
+                                <motion.button 
+                                    whileHover={{ scale: 1.02 }}
+                                    whileTap={{ scale: 0.98 }}
+                                    type="submit" 
+                                    disabled={loading} 
+                                    className={`${formButtonClass} bg-gradient-to-r from-amber-500 via-orange-500 to-yellow-500 hover:from-amber-600 hover:via-orange-600 hover:to-yellow-600 disabled:opacity-50`}
+                                >
+                                    {loading ? 'Creating...' : 'Create Intersection'}
+                                </motion.button>
                             </form>
                         </motion.div>
 
                         {/* Assign Employee Form */}
-                        <motion.div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}>
-                            <div className="flex items-center gap-2 mb-4 text-blue-600">
-                                <UserPlus size={20} />
-                                <h2 className="text-lg font-semibold">Assign Employee</h2>
+                        <motion.div 
+                            initial={{ opacity: 0, y: 20 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            transition={{ delay: 0.2 }}
+                            className="bg-white/60 backdrop-blur-sm p-8 rounded-3xl shadow-xl border border-white/50 hover:shadow-2xl transition-all duration-300"
+                        >
+                            <div className="flex items-center gap-3 mb-6 pb-4 border-b-2 border-amber-200/50">
+                                <div className="p-3 bg-gradient-to-br from-amber-100 to-orange-100 rounded-xl text-amber-600 shadow-md">
+                                    <UserPlus size={28} />
+                                </div>
+                                <h2 className="text-xl font-bold text-gray-900">Assign Employee</h2>
                             </div>
-                            <form onSubmit={(e) => handleSubmit(e, `${API_URL}/intersections/${assignEmployee.intersectionId}/assign_employee`, { employee_id: assignEmployee.employeeId }, 'Employee assigned!')} className="space-y-4">
+                            <form onSubmit={(e) => handleSubmit(e, `${API_URL}/intersections/${assignEmployee.intersectionId}/assign_employee`, { employee_id: assignEmployee.employeeId }, '👤 Employee assigned successfully!')} className="space-y-4">
                                 <input 
-                                    className="w-full px-4 py-2 rounded-lg border border-gray-200 focus:ring-2 focus:ring-blue-500 outline-none"
+                                    className={formInputClass}
                                     placeholder="Intersection ID"
                                     value={assignEmployee.intersectionId}
                                     onChange={e => setAssignEmployee({...assignEmployee, intersectionId: e.target.value})}
                                     required
                                 />
                                 <input 
-                                    className="w-full px-4 py-2 rounded-lg border border-gray-200 focus:ring-2 focus:ring-blue-500 outline-none"
+                                    className={formInputClass}
                                     placeholder="Employee ID"
                                     value={assignEmployee.employeeId}
                                     onChange={e => setAssignEmployee({...assignEmployee, employeeId: e.target.value})}
                                     required
                                 />
-                                <button type="submit" disabled={loading} className="w-full py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg font-medium transition-colors">
-                                    Assign Employee
-                                </button>
+                                <motion.button 
+                                    whileHover={{ scale: 1.02 }}
+                                    whileTap={{ scale: 0.98 }}
+                                    type="submit" 
+                                    disabled={loading}
+                                    className={`${formButtonClass} bg-gradient-to-r from-amber-500 via-orange-500 to-yellow-500 hover:from-amber-600 hover:via-orange-600 hover:to-yellow-600 disabled:opacity-50`}
+                                >
+                                    {loading ? 'Assigning...' : 'Assign Employee'}
+                                </motion.button>
                             </form>
                         </motion.div>
 
                         {/* Register Device Form */}
-                        <motion.div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}>
-                            <div className="flex items-center gap-2 mb-4 text-purple-600">
-                                <Radio size={20} />
-                                <h2 className="text-lg font-semibold">Register IoT Device</h2>
+                        <motion.div 
+                            initial={{ opacity: 0, y: 20 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            transition={{ delay: 0.3 }}
+                            className="bg-white/60 backdrop-blur-sm p-8 rounded-3xl shadow-xl border border-white/50 hover:shadow-2xl transition-all duration-300"
+                        >
+                            <div className="flex items-center gap-3 mb-6 pb-4 border-b-2 border-purple-200/50">
+                                <div className="p-3 bg-gradient-to-br from-purple-100 to-purple-50 rounded-xl text-purple-600 shadow-md">
+                                    <Radio size={28} />
+                                </div>
+                                <h2 className="text-xl font-bold text-gray-900">Register IoT Device</h2>
                             </div>
-                            <form onSubmit={(e) => handleSubmit(e, `${API_URL}/intersections/${registerDevice.intersectionId}/register_device`, { iot_device_id: registerDevice.iotDeviceId }, 'Device registered!')} className="space-y-4">
+                            <form onSubmit={(e) => handleSubmit(e, `${API_URL}/intersections/${registerDevice.intersectionId}/register_device`, { iot_device_id: registerDevice.iotDeviceId }, '📱 Device registered successfully!')} className="space-y-4">
                                 <input 
-                                    className="w-full px-4 py-2 rounded-lg border border-gray-200 focus:ring-2 focus:ring-purple-500 outline-none"
+                                    className={formInputClass}
                                     placeholder="Intersection ID"
                                     value={registerDevice.intersectionId}
                                     onChange={e => setRegisterDevice({...registerDevice, intersectionId: e.target.value})}
                                     required
                                 />
                                 <input 
-                                    className="w-full px-4 py-2 rounded-lg border border-gray-200 focus:ring-2 focus:ring-purple-500 outline-none"
+                                    className={formInputClass}
                                     placeholder="IoT Device ID"
                                     value={registerDevice.iotDeviceId}
                                     onChange={e => setRegisterDevice({...registerDevice, iotDeviceId: e.target.value})}
                                     required
                                 />
-                                <button type="submit" disabled={loading} className="w-full py-2 bg-purple-500 hover:bg-purple-600 text-white rounded-lg font-medium transition-colors">
-                                    Register Device
-                                </button>
+                                <motion.button 
+                                    whileHover={{ scale: 1.02 }}
+                                    whileTap={{ scale: 0.98 }}
+                                    type="submit" 
+                                    disabled={loading}
+                                    className={`${formButtonClass} bg-gradient-to-r from-purple-500 to-purple-600 hover:from-purple-600 hover:to-purple-700 disabled:opacity-50`}
+                                >
+                                    {loading ? 'Registering...' : 'Register Device'}
+                                </motion.button>
                             </form>
                         </motion.div>
                     </div>
 
                     {/* Right Column: List */}
-                    <div className="lg:col-span-2">
-                        <motion.div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 h-full" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }}>
-                            <div className="flex items-center justify-between mb-6">
-                                <div className="flex items-center gap-2 text-gray-800">
-                                    <Activity size={20} />
-                                    <h2 className="text-lg font-semibold">Active Intersections</h2>
+                    <motion.div 
+                        initial={{ opacity: 0, x: 20 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        transition={{ delay: 0.1 }}
+                        className="lg:col-span-2 bg-white/60 backdrop-blur-sm p-8 rounded-3xl shadow-xl border border-white/50 hover:shadow-2xl transition-all"
+                    >
+                        <div className="flex items-center justify-between mb-8 pb-4 border-b-2 border-amber-200/50">
+                            <div className="flex items-center gap-3 text-gray-900">
+                                <div className="p-3 bg-gradient-to-br from-amber-100 to-orange-100 rounded-xl text-amber-600 shadow-md">
+                                    <Activity size={28} />
                                 </div>
-                                <span className="bg-gray-100 text-gray-600 px-3 py-1 rounded-full text-sm font-medium">
-                                    Total: {intersections.length}
-                                </span>
+                                <h2 className="text-2xl font-bold">Active Intersections</h2>
                             </div>
+                            <motion.span 
+                                whileHover={{ scale: 1.05 }}
+                                className="bg-gradient-to-r from-amber-100 to-orange-100 text-amber-800 px-4 py-2 rounded-full text-sm font-bold shadow-md"
+                            >
+                                Total: {intersections.length}
+                            </motion.span>
+                        </div>
 
-                            {msg.text && (
-                                <div className={`mb-6 p-4 rounded-lg ${msg.type === 'success' ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}`}>
-                                    {msg.text}
-                                </div>
-                            )}
-
-                            <div className="space-y-4">
-                                {intersections.length === 0 ? (
-                                    <p className="text-gray-500 text-center py-8">No intersections found.</p>
-                                ) : (
-                                    intersections.map(intersection => (
-                                        <div key={intersection.intersectionId} className="p-4 rounded-lg border border-gray-100 hover:border-amber-200 hover:bg-amber-50/30 transition-all">
-                                            <div className="flex justify-between items-start">
-                                                <div>
-                                                    <h3 className="font-semibold text-gray-900">{intersection.name}</h3>
-                                                    <p className="text-sm text-gray-500 font-mono mt-1">ID: {intersection.intersectionId}</p>
-                                                </div>
-                                                <span className={`px-2 py-1 rounded text-xs font-medium ${intersection.status === 'active' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'}`}>
-                                                    {intersection.status}
-                                                </span>
+                        <div className="space-y-4 max-h-[1000px] overflow-y-auto">
+                            {intersections.length === 0 ? (
+                                <motion.div 
+                                    animate={{ y: [0, -10, 0] }}
+                                    transition={{ duration: 3, repeat: Infinity }}
+                                    className="text-center py-16 text-gray-600"
+                                >
+                                    <p className="text-lg font-medium">No intersections found.</p>
+                                </motion.div>
+                            ) : (
+                                intersections.map((intersection, idx) => (
+                                    <motion.div 
+                                        key={intersection.intersectionId}
+                                        initial={{ opacity: 0, y: 10 }}
+                                        animate={{ opacity: 1, y: 0 }}
+                                        transition={{ delay: idx * 0.05 }}
+                                        whileHover={{ x: 8 }}
+                                        className="p-6 rounded-2xl border border-white/60 hover:border-amber-300/60 bg-white/80 hover:bg-gradient-to-r hover:from-amber-50/80 to-orange-50/80 transition-all duration-300 group cursor-pointer shadow-md hover:shadow-lg"
+                                    >
+                                        <div className="flex justify-between items-start mb-4">
+                                            <div>
+                                                <h3 className="font-bold text-xl text-gray-900 group-hover:text-amber-700 transition-colors">
+                                                    {intersection.name}
+                                                </h3>
+                                                <p className="text-sm text-gray-600 font-mono mt-1">
+                                                    ID: {intersection.intersectionId}
+                                                </p>
                                             </div>
-                                            <div className="mt-4 grid grid-cols-2 gap-4 text-sm">
-                                                <div>
-                                                    <p className="text-gray-500 mb-1">IoT Device</p>
-                                                    <p className="font-medium text-gray-800">{intersection.iotDeviceId || 'Not Registered'}</p>
-                                                </div>
-                                                <div>
-                                                    <p className="text-gray-500 mb-1">Assigned Employees</p>
-                                                    <p className="font-medium text-gray-800">
-                                                        {intersection.assignedEmployees.length > 0 
-                                                            ? intersection.assignedEmployees.join(', ') 
-                                                            : 'None'}
-                                                    </p>
-                                                </div>
-                                            </div>
+                                            <motion.span 
+                                                whileHover={{ scale: 1.1 }}
+                                                className={`px-3 py-1.5 rounded-full text-xs font-bold uppercase tracking-wide transition-all ${
+                                                    intersection.status === 'active' 
+                                                        ? 'bg-emerald-100 text-emerald-700 shadow-md' 
+                                                        : 'bg-gray-100 text-gray-600'
+                                                }`}
+                                            >
+                                                {intersection.status === 'active' ? '🟢 Active' : '⚫ Inactive'}
+                                            </motion.span>
                                         </div>
-                                    ))
-                                )}
-                            </div>
-                        </motion.div>
-                    </div>
+                                        <div className="grid grid-cols-2 gap-4 text-sm">
+                                            <motion.div 
+                                                whileHover={{ scale: 1.05 }}
+                                                className="bg-white/80 backdrop-blur rounded-xl p-3 border border-amber-100/50 shadow-sm"
+                                            >
+                                                <p className="text-gray-700 font-semibold text-xs">📱 IoT Device</p>
+                                                <p className="font-bold text-gray-900 mt-1">
+                                                    {intersection.iotDeviceId || 'Not Registered'}
+                                                </p>
+                                            </motion.div>
+                                            <motion.div 
+                                                whileHover={{ scale: 1.05 }}
+                                                className="bg-white/80 backdrop-blur rounded-xl p-3 border border-amber-100/50 shadow-sm"
+                                            >
+                                                <p className="text-gray-700 font-semibold text-xs">👥 Assigned Employees</p>
+                                                <p className="font-bold text-gray-900 mt-1">
+                                                    {intersection.assignedEmployees.length > 0 
+                                                        ? intersection.assignedEmployees.join(', ') 
+                                                        : 'None'}
+                                                </p>
+                                            </motion.div>
+                                        </div>
+                                    </motion.div>
+                                ))
+                            )}
+                        </div>
+                    </motion.div>
                 </div>
             </div>
         </div>
