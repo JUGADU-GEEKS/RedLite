@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import axios from 'axios';
 import { motion } from 'framer-motion';
-import { UploadCloud, FileVideo, AlertTriangle, CheckCircle, ArrowLeft } from 'lucide-react';
+import { UploadCloud, FileVideo, AlertTriangle, CheckCircle, ArrowLeft, Activity } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import Navbar from '../components/Navbar';
 
@@ -18,10 +18,13 @@ const FloatingElement = ({ children, delay = 0, duration = 3 }) => (
 const WrongSide = () => {
     const [video, setVideo] = useState(null);
     const [detectedPlates, setDetectedPlates] = useState([]);
+    const [currentFrame, setCurrentFrame] = useState(null);
     const [message, setMessage] = useState('');
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
+    const [processing, setProcessing] = useState(false);
     const navigate = useNavigate();
+    const wsRef = useRef(null);
 
     const handleFileChange = (e) => {
         const file = e.target.files[0];
@@ -29,13 +32,15 @@ const WrongSide = () => {
             setVideo(file);
             setMessage('');
             setError('');
+            setCurrentFrame(null);
+            setDetectedPlates([]);
         } else {
             setVideo(null);
             setError('Please select a valid MP4 video file.');
         }
     };
 
-    const handleUpload = async () => {
+    const handleUploadAndStream = async () => {
         if (!video) {
             setError('Please select a video file first.');
             return;
@@ -45,26 +50,86 @@ const WrongSide = () => {
         formData.append('video', video);
 
         setLoading(true);
-        setMessage('Processing video... This may take a moment.');
+        setMessage('Uploading video...');
         setError('');
         setDetectedPlates([]);
+        setCurrentFrame(null);
 
         try {
-            const response = await axios.post('http://localhost:8000/wrong-side', formData, {
+            // 1. Upload the video
+            const response = await axios.post('http://localhost:8000/wrong-side/upload', formData, {
                 headers: {
                     'Content-Type': 'multipart/form-data',
                 },
             });
-            setMessage(response.data.message);
-            setDetectedPlates(response.data.detected_plates);
+
+            const filename = response.data.filename;
+            setMessage('Video uploaded. Starting real-time analysis...');
+            setLoading(false);
+            setProcessing(true);
+
+            // 2. Connect to WebSocket for streaming
+            const wsUrl = `ws://localhost:8000/ws/wrong-side/${filename}`;
+            wsRef.current = new WebSocket(wsUrl);
+
+            wsRef.current.onopen = () => {
+                console.log("WebSocket Connected");
+            };
+
+            wsRef.current.onmessage = (event) => {
+                const data = JSON.parse(event.data);
+                
+                if (data.frame) {
+                    setCurrentFrame(`data:image/jpeg;base64,${data.frame}`);
+                }
+                
+                if (data.detected_plates) {
+                    setDetectedPlates(data.detected_plates);
+                }
+
+                if (data.status === "complete") {
+                    setProcessing(false);
+                    setMessage("Analysis Complete.");
+                    wsRef.current.close();
+                }
+                
+                if (data.error) {
+                    setError(`Error: ${data.error}`);
+                    setProcessing(false);
+                    wsRef.current.close();
+                }
+            };
+
+            wsRef.current.onerror = (err) => {
+                console.error("WebSocket Error:", err);
+                setError("Connection error during streaming.");
+                setProcessing(false);
+            };
+
+            wsRef.current.onclose = () => {
+                console.log("WebSocket Disconnected");
+                if (processing) {
+                     // If closed unexpectedly
+                     // setProcessing(false); 
+                }
+            };
+
         } catch (err) {
             console.error('Error uploading video:', err);
             setError('Error uploading video. Please check the console for details and try again.');
             setMessage('');
-        } finally {
             setLoading(false);
         }
     };
+
+    // Cleanup WebSocket on unmount
+    useEffect(() => {
+        return () => {
+            if (wsRef.current) {
+                wsRef.current.close();
+            }
+        };
+    }, []);
 
     return (
         <div className="min-h-screen bg-gradient-to-br from-amber-50 via-orange-50 to-yellow-50 relative overflow-hidden">
@@ -118,7 +183,7 @@ const WrongSide = () => {
                     </h1>
                     <div className="w-24 h-1 bg-gradient-to-r from-amber-500 to-orange-500 rounded-full mx-auto mb-8"></div>
                     <p className="text-lg md:text-xl max-w-2xl mx-auto text-gray-600 leading-relaxed font-light">
-                        Upload a video to detect vehicles traveling on the wrong side and identify their license plates.
+                        Upload a video to detect vehicles traveling on the wrong side and identify their license plates in real-time.
                     </p>
                 </motion.div>
 
@@ -149,13 +214,18 @@ const WrongSide = () => {
                     </div>
 
                     <motion.button
-                        onClick={handleUpload}
-                        disabled={loading}
-                        className="w-full bg-gradient-to-r from-amber-500 to-orange-500 text-white font-bold py-3 px-4 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed hover:from-amber-600 hover:to-orange-600"
+                        onClick={handleUploadAndStream}
+                        disabled={loading || processing}
+                        className="w-full bg-gradient-to-r from-amber-500 to-orange-500 text-white font-bold py-3 px-4 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed hover:from-amber-600 hover:to-orange-600 flex items-center justify-center"
                         whileHover={{ scale: 1.02 }}
                         whileTap={{ scale: 0.98 }}
                     >
-                        {loading ? 'Analyzing...' : 'Detect Wrong-Side Vehicles'}
+                        {loading ? 'Uploading...' : processing ? (
+                            <>
+                                <Activity className="w-5 h-5 mr-2 animate-pulse" />
+                                Processing Live Stream...
+                            </>
+                        ) : 'Start Real-Time Detection'}
                     </motion.button>
 
                     {error && (
@@ -170,7 +240,7 @@ const WrongSide = () => {
                     )}
                 </motion.div>
 
-                {(message || detectedPlates.length > 0) && (
+                {(message || detectedPlates.length > 0 || currentFrame) && (
                     <motion.div
                         initial={{ opacity: 0, y: 50 }}
                         animate={{ opacity: 1, y: 0 }}
@@ -183,6 +253,20 @@ const WrongSide = () => {
                                 <p className="text-lg text-gray-700 font-medium">{message}</p>
                             </div>
                         )}
+
+                        {currentFrame && (
+                            <div className="mb-8">
+                                <h2 className="text-2xl font-bold text-center mb-4 bg-gradient-to-r from-amber-600 to-orange-600 bg-clip-text text-transparent">Live Analysis</h2>
+                                <div className="rounded-xl overflow-hidden shadow-lg border-2 border-amber-200 bg-black">
+                                    <img 
+                                        src={currentFrame} 
+                                        alt="Live Analysis" 
+                                        className="w-full h-auto"
+                                    />
+                                </div>
+                            </div>
+                        )}
+
                         {detectedPlates.length > 0 && (
                             <div>
                                 <h2 className="text-2xl font-bold text-center mb-6 bg-gradient-to-r from-amber-600 to-orange-600 bg-clip-text text-transparent">Detected License Plates</h2>
