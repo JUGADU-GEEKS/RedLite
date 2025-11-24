@@ -1,6 +1,7 @@
 from bson import ObjectId
 from pydantic import BaseModel, Field, GetJsonSchemaHandler
-from typing import Optional, List, Any
+from typing import Optional, List, Any, Union
+from datetime import datetime
 from pydantic_core import core_schema
 
 class PyObjectId(str):
@@ -29,16 +30,16 @@ class PyObjectId(str):
         return handler(core_schema.str_schema())
 
 class IntersectionModel(BaseModel):
-    id: PyObjectId = Field(default_factory=PyObjectId, alias="_id")
+    id: Optional[PyObjectId] = Field(default_factory=lambda: str(ObjectId()), alias="_id")
     intersectionId: str = Field(...)
-    name: str = Field(...)
-    coordinates: dict = Field(...)
-    lanes: dict = Field(...)
+    name: Optional[str] = None
+    coordinates: Optional[dict] = None
+    lanes: Optional[dict] = None
     iotDeviceId: Optional[str] = None
     assignedEmployees: List[str] = []
     status: str = "active"
-    createdAt: int = 0
-    updatedAt: int = 0
+    createdAt: Union[int, datetime] = 0
+    updatedAt: Union[int, datetime] = 0
 
     class Config:
         populate_by_name = True
