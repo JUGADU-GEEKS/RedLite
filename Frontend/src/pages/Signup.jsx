@@ -24,7 +24,14 @@ const FloatingElement = ({ children, delay = 0, duration = 3 }) => (
 
 export default function SignupPage() {
   const navigate = useNavigate();
-  const [form, setForm] = useState({ name: '', email: '', password: '', role: 'user' });
+  const [form, setForm] = useState({ 
+    name: '', 
+    email: '', 
+    password: '', 
+    role: 'user',
+    driverLicense: '',
+    vehicleId: ''
+  });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -37,7 +44,22 @@ export default function SignupPage() {
     setError('');
     setLoading(true);
     try {
-      await signup(form);
+      const payload = {
+        name: form.name,
+        email: form.email,
+        password: form.password,
+        role: form.role
+      };
+
+      if (form.role === 'ambulance_driver') {
+        payload.ambulanceInfo = {
+          driverLicense: form.driverLicense,
+          vehicleId: form.vehicleId,
+          authorized: true // Auto-authorize for demo
+        };
+      }
+
+      await signup(payload);
       // After signup, navigate to login
       navigate('/login');
     } catch (err) {
@@ -206,6 +228,7 @@ export default function SignupPage() {
                   >
                     <option value="user">Civilian</option>
                     <option value="employee">Traffic Officer</option>
+                    <option value="ambulance_driver">Ambulance Driver</option>
                   </select>
                   <div className="absolute right-4 top-1/2 transform -translate-y-1/2 pointer-events-none">
                     <svg className="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -214,6 +237,45 @@ export default function SignupPage() {
                   </div>
                 </div>
               </motion.div>
+
+              {/* Ambulance Info Fields */}
+              {form.role === 'ambulance_driver' && (
+                <motion.div
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: 'auto' }}
+                  exit={{ opacity: 0, height: 0 }}
+                  className="space-y-5"
+                >
+                  <div>
+                    <label className="block text-gray-700 font-semibold mb-2">
+                      Driver License Number
+                    </label>
+                    <input
+                      type="text"
+                      name="driverLicense"
+                      value={form.driverLicense}
+                      onChange={handleChange}
+                      placeholder="DL-XXXX-XXXX"
+                      className="w-full px-4 py-4 bg-white/60 backdrop-blur-sm border border-gray-200/50 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent transition-all duration-300"
+                      required={form.role === 'ambulance_driver'}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-gray-700 font-semibold mb-2">
+                      Vehicle ID
+                    </label>
+                    <input
+                      type="text"
+                      name="vehicleId"
+                      value={form.vehicleId}
+                      onChange={handleChange}
+                      placeholder="AMB-XXX"
+                      className="w-full px-4 py-4 bg-white/60 backdrop-blur-sm border border-gray-200/50 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent transition-all duration-300"
+                      required={form.role === 'ambulance_driver'}
+                    />
+                  </div>
+                </motion.div>
+              )}
 
               {error && <p className="text-red-500 text-sm text-center">{error}</p>}
 

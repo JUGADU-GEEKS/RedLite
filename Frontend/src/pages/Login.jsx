@@ -36,6 +36,7 @@ export default function LoginPage() {
     try {
       const user = await login(email, password);
       if (user.role === 'admin') navigate('/admin');
+      else if (user.role === 'ambulance_driver') navigate('/ambulance-dashboard');
       else if (user.role === 'employee') {
         const ints = user.assignedIntersections || [];
         if (ints.length > 0) navigate(`/dashboard`);

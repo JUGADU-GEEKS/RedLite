@@ -92,6 +92,8 @@ class WebSocketManager:
             await connection.send_json(payload)
 
 
+from services import emergency_service
+
 class LaneService:
     def __init__(self, mongo_url: str):
         self.detector = VideoYOLODetector(DEFAULT_INTERSECTION_ID)
@@ -143,6 +145,10 @@ class LaneService:
         """
         while not self.stop_event.is_set():
             try:
+                # Check for Emergency Override at the start of the cycle or loop
+                # We need to check frequently, not just at cycle start.
+                # So we will check inside the lane loops.
+                
                 # STEP 1: Compute priority ONCE at cycle start
                 # Capture density snapshot and current ages
                 cycle_plan = await self.run_cycle_plan(DEFAULT_INTERSECTION_ID)
@@ -160,6 +166,95 @@ class LaneService:
                     
                     # GREEN PHASE - Fixed duration based on rank
                     for remaining in range(green_duration, 0, -1):
+                        # --- EMERGENCY OVERRIDE CHECK ---
+                        active_override = None
+                        # Check known intersection IDs (or ideally use DEFAULT_INTERSECTION_ID if it matches)
+                        # Assuming DEFAULT_INTERSECTION_ID is what we are controlling
+                        override = emergency_service.get_active_override(DEFAULT_INTERSECTION_ID)
+                        if not override:
+                             # Fallback check for demo IDs if DEFAULT_INTERSECTION_ID is generic
+                             for i_id in ["INT-01", "INT-02", "INT-03"]:
+                                 ov = emergency_service.get_active_override(i_id)
+                                 if ov and ov['active']:
+                                     override = ov
+                                     break
+                        
+                        if override and override['active']:
+                            override_direction = override['direction'].lower()
+                            logger.info(f"[AMBULANCE] OVERRIDE ACTIVE in LaneService: {override_direction} GREEN")
+                            
+                            # Force override state
+                            current_frames = {}
+                            for l in LANES:
+                                frame = self.detector.read_frame(l)
+                                current_frames[l] = frame if frame else ""
+                            
+                            light_state = {l: "green" if l == override_direction else "red" for l in LANES}
+                            
+                            payload = {
+                                "phase": "green",
+                                "lane": override_direction,
+                                "remaining": 99, # Indefinite
+                                "counts": counts_snapshot,
+                                "frames": current_frames,
+                                "priority_order": priority_order,
+                                "durations": durations,
+                                "ages": ages_snapshot,
+                                "lights": light_state,
+                                "override_active": True,
+                                "override_direction": override_direction
+                            }
+                            await self.ws_manager.broadcast(payload)
+                            await asyncio.sleep(0.5)
+                            continue # Skip normal logic and stay in this loop iteration (effectively pausing the countdown)
+                            # Actually, 'continue' here just goes to next iteration of 'remaining' loop
+                            # But we want to PAUSE the countdown.
+                            # So we should probably stay in a while loop here until override clears.
+                            
+                            while True:
+                                # Re-check override
+                                override = emergency_service.get_active_override(DEFAULT_INTERSECTION_ID)
+                                if not override:
+                                     for i_id in ["INT-01", "INT-02", "INT-03"]:
+                                         ov = emergency_service.get_active_override(i_id)
+                                         if ov and ov['active']:
+                                             override = ov
+                                             break
+                                
+                                if not override or not override['active']:
+                                    logger.info("[AMBULANCE] Override cleared, resuming cycle.")
+                                    break
+                                
+                                # Still active
+                                override_direction = override['direction'].lower()
+                                current_frames = {}
+                                for l in LANES:
+                                    frame = self.detector.read_frame(l)
+                                    current_frames[l] = frame if frame else ""
+                                
+                                light_state = {l: "green" if l == override_direction else "red" for l in LANES}
+                                payload = {
+                                    "phase": "green",
+                                    "lane": override_direction,
+                                    "remaining": 99,
+                                    "counts": counts_snapshot,
+                                    "frames": current_frames,
+                                    "priority_order": priority_order,
+                                    "durations": durations,
+                                    "ages": ages_snapshot,
+                                    "lights": light_state,
+                                    "override_active": True,
+                                    "override_direction": override_direction
+                                }
+                                await self.ws_manager.broadcast(payload)
+                                await asyncio.sleep(0.5)
+                            
+                            # When loop breaks, we resume. 
+                            # We might want to restart the current phase or just continue.
+                            # Let's continue decrementing 'remaining' from where we left off.
+                        
+                        # --- END EMERGENCY OVERRIDE CHECK ---
+
                         # Continuously read frames for all lanes during green
                         current_frames = {}
                         for l in LANES:

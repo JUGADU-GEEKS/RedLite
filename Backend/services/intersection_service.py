@@ -36,10 +36,17 @@ def create_intersection(intersection_data: dict):
     return str(result.inserted_id)
 
 def get_intersection_by_id(intersection_id: str):
-    return intersections_collection.find_one({"intersectionId": intersection_id})
+    intersection = intersections_collection.find_one({"intersectionId": intersection_id})
+    if intersection and "_id" in intersection:
+        intersection["_id"] = str(intersection["_id"])
+    return intersection
 
 def get_all_intersections(skip: int = 0, limit: int = 10):
-    return list(intersections_collection.find().skip(skip).limit(limit))
+    intersections = list(intersections_collection.find().skip(skip).limit(limit))
+    for i in intersections:
+        if "_id" in i:
+            i["_id"] = str(i["_id"])
+    return intersections
 
 def assign_employee_to_intersection(intersection_id: str, employee_id: str):
     print(f"Attempting to assign {employee_id} to {intersection_id}")

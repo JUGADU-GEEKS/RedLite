@@ -131,9 +131,27 @@ const LaneDashboard = () => {
   const currentLane = data.lane;
   const remainingSeconds = data.remaining || 0;
   const currentPhase = data.phase || 'red';
+  const isOverride = data.override_active;
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-amber-50 via-orange-50 to-yellow-50 relative overflow-hidden">
+    <div className={`min-h-screen relative overflow-hidden ${isOverride ? 'bg-red-50' : 'bg-gradient-to-br from-amber-50 via-orange-50 to-yellow-50'}`}>
+      {/* Emergency Override Overlay */}
+      {isOverride && (
+        <div className="fixed inset-0 z-50 pointer-events-none flex items-center justify-center">
+          <div className="absolute inset-0 bg-red-500/10 animate-pulse"></div>
+          <div className="bg-red-600 text-white px-12 py-6 rounded-3xl shadow-2xl transform animate-bounce border-4 border-white/50">
+            <h1 className="text-5xl font-black tracking-wider flex items-center gap-4">
+              <span className="text-6xl">🚑</span>
+              EMERGENCY OVERRIDE
+              <span className="text-6xl">🚨</span>
+            </h1>
+            <p className="text-center text-xl font-bold mt-2 text-red-100">
+              AMBULANCE APPROACHING - {data.override_direction?.toUpperCase()} LANE GREEN
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* Soft gradient orbs */}
       <div className="absolute top-10 left-10 w-96 h-96 bg-gradient-to-br from-amber-200/20 to-orange-200/20 rounded-full blur-3xl"></div>
       <div className="absolute top-40 right-20 w-80 h-80 bg-gradient-to-br from-yellow-200/20 to-amber-200/20 rounded-full blur-3xl"></div>
