@@ -1,12 +1,11 @@
 import time
 import math
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional
 from fastapi import HTTPException
 from datetime import datetime, timedelta
 from models.intersections import IntersectionModel
 from services import intersection_service
 from services.override_db import override_collection
-from bson import ObjectId
 
 # Global state for emergency overrides (REPLACED BY DB)
 # intersection_locks: Dict[str, Dict] = {}
@@ -17,6 +16,19 @@ MAX_OVERRIDE_TIME = 120  # seconds
 HEARTBEAT_TIMEOUT = 10   # seconds
 CLEAR_DISTANCE_THRESHOLD = 45 # meters
 ACTIVATION_ETA_THRESHOLD = 10 # seconds
+MIN_SPEED_FALLBACK = 1.5  # meters per second fallback when vehicle is crawling
+SPEED_THRESHOLD_MPS = 0.2777777777777778  # 1 km/h in m/s
+
+def _effective_speed(speed: float) -> float:
+    if speed is None:
+        return MIN_SPEED_FALLBACK
+    return speed if speed > SPEED_THRESHOLD_MPS else MIN_SPEED_FALLBACK
+
+def compute_eta(distance_m: float, speed_mps: float) -> float:
+    if distance_m <= 0:
+        return 0.0
+    eff_speed = _effective_speed(speed_mps)
+    return distance_m / eff_speed
 
 def haversine_distance(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
     """Calculate distance between two points in meters."""
@@ -133,10 +145,8 @@ def request_override(user_id: str, vehicle_id: str, lat: float, lon: float, head
     intersection_id = target["intersectionId"]
     distance = target["distance"]
     
-    # Calculate ETA
-    # Speed is in m/s. If speed is too low (< 1 km/h ~= 0.27 m/s), assume fallback speed 5 m/s
-    effective_speed = speed if speed > 0.5 else 5.0
-    eta = distance / effective_speed
+    # Calculate ETA using consistent fallback rules
+    eta = compute_eta(distance, speed)
     
     # Determine approach lane
     approach_lane = determine_approach_lane(target["bearing"])
@@ -146,6 +156,8 @@ def request_override(user_id: str, vehicle_id: str, lat: float, lon: float, head
     # Locking Logic - Now using MongoDB
     current_lock = override_collection.find_one({"intersectionId": intersection_id})
     
+    queue_position = 0
+
     if not current_lock:
         # Create new lock document
         new_lock = {
@@ -240,6 +252,12 @@ def request_override(user_id: str, vehicle_id: str, lat: float, lon: float, head
                     }
                 )
                 status = "queued"
+                updated_lock = override_collection.find_one({"_id": current_lock["_id"]})
+                queue = updated_lock.get("queue", []) if updated_lock else []
+                for idx, queued in enumerate(queue):
+                    if queued["requestId"] == request_id:
+                        queue_position = idx + 1
+                        break
 
 
     return {
@@ -249,7 +267,8 @@ def request_override(user_id: str, vehicle_id: str, lat: float, lon: float, head
         "targetLane": approach_lane,
         "eta": eta,
         "distance": distance,
-        "requestId": request_id
+        "requestId": request_id,
+        "queuePosition": queue_position
     }
 
 def process_heartbeat(user_id: str, lat: float, lon: float, heading: float, speed: float):
@@ -260,8 +279,8 @@ def process_heartbeat(user_id: str, lat: float, lon: float, heading: float, spee
     active_lock = override_collection.find_one({"lockOwner": {"$regex": f"^{user_id}_"}})
     
     if not active_lock:
-        # User might have lost lock or it expired, try to request again
-        return request_override(user_id, "UNKNOWN", lat, lon, heading, speed)
+        # Nothing to update — the client must explicitly start again
+        return {"status": "idle", "reason": "no_active_override"}
 
     intersection_id = active_lock["intersectionId"]
     
@@ -284,8 +303,7 @@ def process_heartbeat(user_id: str, lat: float, lon: float, heading: float, spee
     bearing_to_int = calculate_bearing(lat, lon, i_coords["lat"], i_coords["lon"])
     angle_diff = get_angle_difference(heading, bearing_to_int)
     
-    effective_speed = speed if speed > 0.5 else 5.0
-    eta = dist / effective_speed
+    eta = compute_eta(dist, speed)
     update_data["$set"]["ownerEta"] = eta
     
     # Update status if needed
@@ -363,4 +381,81 @@ def get_active_override(intersection_id: str) -> Optional[Dict]:
             "vehicleId": lock["ownerVehicleId"]
         }
     return None
+
+def get_driver_status(user_id: str) -> Dict:
+    """
+    Provide current override/queue state for a specific ambulance driver.
+    """
+    now = datetime.utcnow()
+    lock = override_collection.find_one({"lockOwner": {"$regex": f"^{user_id}_"}})
+    if lock:
+        remaining = None
+        expires_at = lock.get("expiresAt")
+        if isinstance(expires_at, datetime):
+            remaining = max(0, (expires_at - now).total_seconds())
+        return {
+            "status": lock.get("status", "scheduled"),
+            "intersectionId": lock.get("intersectionId"),
+            "intersectionName": lock.get("intersectionName"),
+            "targetLane": lock.get("targetLane"),
+            "requestId": lock.get("lockOwner"),
+            "queuePosition": 0,
+            "overrideActive": lock.get("status") == "active",
+            "eta": lock.get("ownerEta"),
+            "remainingSeconds": remaining
+        }
+
+    queued_lock = override_collection.find_one({"queue.requestId": {"$regex": f"^{user_id}_"}})
+    if queued_lock:
+        queue = queued_lock.get("queue", [])
+        position = None
+        request_id = None
+        eta = None
+        for idx, entry in enumerate(queue):
+            if entry["requestId"].startswith(f"{user_id}_"):
+                position = idx + 1
+                request_id = entry["requestId"]
+                eta = entry.get("eta")
+                break
+        return {
+            "status": "queued",
+            "intersectionId": queued_lock.get("intersectionId"),
+            "intersectionName": queued_lock.get("intersectionName"),
+            "targetLane": queued_lock.get("targetLane"),
+            "requestId": request_id,
+            "queuePosition": position,
+            "overrideActive": False,
+            "eta": eta,
+            "remainingSeconds": None
+        }
+
+    return {
+        "status": "idle",
+        "queuePosition": None,
+        "overrideActive": False
+    }
+
+def get_override_overview() -> List[Dict]:
+    """
+    Snapshot of every active override/queue for admin dashboards.
+    """
+    now = datetime.utcnow()
+    overview: List[Dict] = []
+    for lock in override_collection.find({}):
+        expires_at = lock.get("expiresAt")
+        remaining = None
+        if isinstance(expires_at, datetime):
+            remaining = max(0, (expires_at - now).total_seconds())
+        overview.append({
+            "intersectionId": lock.get("intersectionId"),
+            "intersectionName": lock.get("intersectionName"),
+            "status": lock.get("status"),
+            "targetLane": lock.get("targetLane"),
+            "requestId": lock.get("lockOwner"),
+            "ownerEta": lock.get("ownerEta"),
+            "overrideActive": lock.get("status") == "active",
+            "remainingSeconds": remaining,
+            "queue": lock.get("queue", [])
+        })
+    return overview
 

@@ -94,6 +94,21 @@ def register_device_for_intersection(intersection_id: str, device_id: str):
     )
     return result.modified_count > 0
 
+def update_coordinates_for_intersection(intersection_id: str, lat: float, lon: float):
+    """
+    Persist updated coordinates for an intersection.
+    """
+    update = {
+        "$set": {
+            "coordinates": {"lat": lat, "lon": lon},
+            "updatedAt": int(time.time())
+        }
+    }
+    result = intersections_collection.update_one({"intersectionId": intersection_id}, update)
+    if result.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Intersection not found")
+    return True
+
 def get_device_for_intersection(intersection_id: str):
     intersection = get_intersection_by_id(intersection_id)
     if not intersection or not intersection.get("iotDeviceId"):
