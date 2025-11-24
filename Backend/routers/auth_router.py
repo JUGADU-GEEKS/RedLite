@@ -35,6 +35,13 @@ async def signup(payload: UserIn, db=Depends(get_db)):
         "createdAt": now,
         "updatedAt": now,
     }
+    
+    if payload.role == "ambulance_driver" and payload.ambulanceInfo:
+        user_doc["ambulanceInfo"] = payload.ambulanceInfo.dict()
+        # Auto-authorize for demo purposes if not specified
+        if "authorized" not in user_doc["ambulanceInfo"]:
+             user_doc["ambulanceInfo"]["authorized"] = True
+
     await db.users.insert_one(user_doc)
     return UserPublic(**{
         "userId": user_doc["userId"],
@@ -42,6 +49,7 @@ async def signup(payload: UserIn, db=Depends(get_db)):
         "name": user_doc["name"],
         "role": user_doc["role"],
         "assignedIntersections": user_doc["assignedIntersections"],
+        "ambulanceInfo": user_doc.get("ambulanceInfo")
     })
 
 
@@ -72,6 +80,7 @@ async def login(payload: LoginIn, db=Depends(get_db)):
             "name": user["name"],
             "role": user.get("role", "user"),
             "assignedIntersections": user.get("assignedIntersections", []),
+            "ambulanceInfo": user.get("ambulanceInfo"),
         },
     }
 

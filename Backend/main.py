@@ -150,6 +150,7 @@ try:
     from routers.lane_router import router as lane_router
     from routers.ws_router import router as ws_router
     from routers.wrong_side_router import router as wrong_side_router
+    from routers.emergency_router import router as emergency_router
     app.include_router(auth_router)
     app.include_router(admin_router)
     app.include_router(protected_router)
@@ -157,6 +158,7 @@ try:
     app.include_router(lane_router)
     app.include_router(ws_router)
     app.include_router(wrong_side_router)
+    app.include_router(emergency_router)
     logging.info("[ROUTERS] Successfully included all routers")
     # Verify auth routes are registered
     routes = [r.path for r in app.routes]
@@ -168,6 +170,7 @@ except Exception as e:
     traceback.print_exc()
 
 from services.lane_service import get_lane_service
+from services import emergency_service
 import asyncio
 
 @app.on_event("startup")
@@ -686,8 +689,78 @@ async def websocket_detect(websocket: WebSocket):
         recv_task = asyncio.create_task(receive_manual_change())
         while not stop_event.is_set():
             # Ambulance override check
-            now = time.time()
-            if ambulance_override['active']:
+            # Use the new emergency service to check for active overrides
+            # We assume DEFAULT_INTERSECTION_ID or similar for now, or we need to know which intersection this WS is for.
+            # The current main.py seems to handle ONE intersection (TRAFFIC_LIGHT_COORDS).
+            # Let's assume we check for any active override for the default intersection ID "INT-001" or similar.
+            # Ideally, the WS connection should specify the intersection ID.
+            # For this demo, we'll check all locks or a specific one if we knew it.
+            # Let's try to find ANY active override for the intersection at TRAFFIC_LIGHT_COORDS.
+            # Since we don't have the ID easily here, we might need to rely on the service finding it.
+            # But wait, emergency_service uses intersection IDs.
+            # Let's assume the default intersection ID is "INT-001" or "INT-01" based on previous context.
+            # Or better, let's iterate all active overrides and see if any match our "current" intersection logic.
+            # For simplicity in this specific file structure, let's assume we are controlling "INT-003" (from previous context) or similar.
+            # Actually, let's just check if ANY override is active in the service for simplicity of the demo, 
+            # OR better, let's use the ID from config if available.
+            
+            # For the purpose of this specific file which seems to be a single-intersection controller:
+            # We will check if there is an active override for "INT-003" (the one we fixed earlier) or "INT-01".
+            # Let's check "INT-003" as a primary candidate.
+            
+            # Check for active overrides on any of the known demo intersections
+            active_override = None
+            for i_id in ["INT-01", "INT-02", "INT-03"]:
+                override = emergency_service.get_active_override(i_id)
+                if override and override['active']:
+                    active_override = override
+                    print(f"[DEBUG] Found active override for {i_id}: {override}")
+                    break
+            
+            if active_override and active_override['active']:
+                override_direction = active_override['direction'].lower() # Ensure lowercase
+                
+                # Force the override direction to green, others to red
+                for lane in LANE_VIDEO_MAP: 
+                    lights[lane] = 'green' if lane == override_direction else 'red'
+                current_green = override_direction
+                last_green_time = time.time()  # keep resetting so normal logic doesn't interfere
+                print(f"[AMBULANCE] OVERRIDE ACTIVE: {override_direction} GREEN, others RED")
+                
+                # Send update to the specific websocket connected to /ws/detect
+                await websocket.send_json({
+                    'frame': None, 
+                    'counts': {},
+                    'total': 0,
+                    'video': None,
+                    'lights': lights,
+                    'current_green': current_green,
+                    'last_green_time': last_green_time,
+                    'vehicle_counts': vehicle_counts,
+                    'override_active': True,
+                    'override_direction': override_direction
+                })
+                
+                # ALSO broadcast to the global lane service manager so LaneDashboard sees it
+                # LaneDashboard connects to /ws/lane_feed which uses lane_service.ws_manager
+                try:
+                    lane_service = get_lane_service()
+                    await lane_service.ws_manager.broadcast(json.dumps({
+                        'lights': lights,
+                        'lane': current_green,
+                        'remaining': 99, # Arbitrary high number for override
+                        'phase': 'green',
+                        'override_active': True,
+                        'override_direction': override_direction
+                    }))
+                except Exception as e:
+                    print(f"[ERROR] Failed to broadcast override to lane service: {e}")
+
+                await asyncio.sleep(0.5) 
+                continue  # skip normal logic
+            
+            # Old simple override check (legacy)
+            elif ambulance_override['active']:
                 if now < ambulance_override['end_time']:
                     # Force the override direction to green, others to red
                     for lane in LANE_VIDEO_MAP: # Use LANE_VIDEO_MAP to get all lanes

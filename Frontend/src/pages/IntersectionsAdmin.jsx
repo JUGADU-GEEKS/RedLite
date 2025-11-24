@@ -39,6 +39,33 @@ const IntersectionsAdmin = () => {
         fetchIntersections();
     }, []);
 
+    const handleGetLocation = () => {
+        if (navigator.geolocation) {
+            // Use a temporary loading state just for this action if needed, 
+            // but reusing 'loading' is fine if we want to block other actions.
+            // Or better, just show a toast.
+            navigator.geolocation.getCurrentPosition(
+                (position) => {
+                    setNewIntersection(prev => ({
+                        ...prev,
+                        coordinates: {
+                            lat: position.coords.latitude,
+                            lon: position.coords.longitude
+                        }
+                    }));
+                    setMsg({ type: 'success', text: '📍 Location fetched successfully!' });
+                    setTimeout(() => setMsg({ type: '', text: '' }), 3000);
+                },
+                (error) => {
+                    console.error("Error getting location:", error);
+                    setMsg({ type: 'error', text: '❌ Failed to get location. Please allow access.' });
+                }
+            );
+        } else {
+            setMsg({ type: 'error', text: '❌ Geolocation is not supported by this browser.' });
+        }
+    };
+
     const handleSubmit = async (e, url, body, successMsg) => {
         e.preventDefault();
         setLoading(true);
@@ -156,15 +183,25 @@ const IntersectionsAdmin = () => {
                                         type="number" step="any"
                                         className={formInputClass}
                                         placeholder="Latitude"
+                                        value={newIntersection.coordinates.lat || ''}
                                         onChange={e => setNewIntersection({...newIntersection, coordinates: {...newIntersection.coordinates, lat: parseFloat(e.target.value)}})}
                                     />
                                     <input 
                                         type="number" step="any"
                                         className={formInputClass}
                                         placeholder="Longitude"
+                                        value={newIntersection.coordinates.lon || ''}
                                         onChange={e => setNewIntersection({...newIntersection, coordinates: {...newIntersection.coordinates, lon: parseFloat(e.target.value)}})}
                                     />
                                 </div>
+                                <button 
+                                    type="button"
+                                    onClick={handleGetLocation}
+                                    className="w-full py-2 bg-amber-100 text-amber-700 rounded-xl font-semibold hover:bg-amber-200 transition-colors flex items-center justify-center gap-2"
+                                >
+                                    <MapPin size={18} />
+                                    Get Current Location
+                                </button>
                                 <motion.button 
                                     whileHover={{ scale: 1.02 }}
                                     whileTap={{ scale: 0.98 }}

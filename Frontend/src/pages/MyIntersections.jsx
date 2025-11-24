@@ -153,7 +153,9 @@ const MyIntersections = () => {
                                             >
                                                 <span className="text-gray-700 font-semibold">📍 Coordinates</span>
                                                 <span className="font-mono font-bold text-gray-900 text-xs">
-                                                    {intersection.coordinates?.lat?.toFixed(4)}, {intersection.coordinates?.lon?.toFixed(4)}
+                                                    {intersection.coordinates && intersection.coordinates.lat && intersection.coordinates.lon 
+                                                        ? `${intersection.coordinates.lat.toFixed(4)}, ${intersection.coordinates.lon.toFixed(4)}`
+                                                        : 'N/A'}
                                                 </span>
                                             </motion.div>
                                         </div>
