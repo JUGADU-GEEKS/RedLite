@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useParams } from 'react-router-dom';
 import LaneCard from '../components/LaneCard';
 import { useAuth } from '../services/auth';
@@ -11,6 +11,8 @@ const LaneDashboard = () => {
   const [signalStatus, setSignalStatus] = useState(null);
   const [loading, setLoading] = useState(true);
   const { token } = useAuth() || {};
+
+  const lastGreenLaneRef = useRef(null); // track last spoken green lane
 
   const API_BASE = import.meta.env.VITE_API_BASE || "http://localhost:8000";
 
@@ -35,6 +37,62 @@ const LaneDashboard = () => {
 
     fetchSignalStatus();
   }, [intersectionId, API_BASE]);
+
+  // Speak the lane name whenever the green light changes to a different lane
+  useEffect(() => {
+    const currentLane = signalStatus?.currentLane;
+    const phase = signalStatus?.phase;
+
+    if (phase === 'green' && currentLane && lastGreenLaneRef.current !== currentLane) {
+      lastGreenLaneRef.current = currentLane;
+
+      // Use Web Speech API if available
+      if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+        try {
+          window.speechSynthesis.cancel(); // stop any ongoing speech
+
+          const speak = (text) => {
+            const utter = new SpeechSynthesisUtterance(text);
+            utter.lang = 'en-US';
+            utter.rate = 1;
+            utter.pitch = 1;
+
+            const pickFemaleVoice = (voices) => {
+              // Prefer known female voice names, then en-US voices, then fallback
+              const femaleNames = /female|zira|samantha|kendra|joanna|amy|susan|kate|victoria|alloy|nicky|alyssa|maria/i;
+              let v = voices.find(v => femaleNames.test(v.name));
+              if (!v) v = voices.find(v => v.lang && v.lang.toLowerCase().startsWith('en-us'));
+              if (!v) v = voices.find(v => v.lang && v.lang.toLowerCase().startsWith('en'));
+              if (!v) v = voices[0];
+              return v;
+            };
+
+            let voices = window.speechSynthesis.getVoices();
+            if (!voices || voices.length === 0) {
+              // voices may not be loaded yet — wait for the event
+              window.speechSynthesis.onvoiceschanged = () => {
+                voices = window.speechSynthesis.getVoices();
+                const voice = pickFemaleVoice(voices);
+                if (voice) utter.voice = voice;
+                window.speechSynthesis.speak(utter);
+              };
+            } else {
+              const voice = pickFemaleVoice(voices);
+              if (voice) utter.voice = voice;
+              window.speechSynthesis.speak(utter);
+            }
+          };
+
+          speak(currentLane);
+        } catch (e) {
+          console.error('Speech synthesis error:', e);
+        }
+      } else {
+        // Fallback log for environments without Web Speech API
+        console.log('Green lane changed to:', currentLane);
+      }
+    }
+  }, [signalStatus]);
 
   useEffect(() => {
     const ws = new WebSocket(`ws://localhost:8000/ws/lane_feed`);
