@@ -13,8 +13,7 @@ import {
     deriveHeadingDeg,
     haversineDistanceMeters,
     calculateBearingDeg,
-    angleDifferenceDeg,
-    computeEtaSeconds
+    angleDifferenceDeg
 } from '../utils/geo';
 
 const GEO_OPTIONS = {
@@ -190,8 +189,19 @@ const AmbulanceDashboard = () => {
                 }
                 const distance = haversineDistanceMeters(pos.lat, pos.lon, coords.lat, coords.lon);
                 const bearing = calculateBearingDeg(pos.lat, pos.lon, coords.lat, coords.lon);
-                const angleDiff = angleDifferenceDeg(pos.headingDeg, bearing);
-                const ahead = angleDiff !== null && angleDiff <= 90;
+                
+                let ahead = false;
+                let angleDiff = null;
+
+                if (pos.headingDeg !== null) {
+                    angleDiff = angleDifferenceDeg(pos.headingDeg, bearing);
+                    ahead = angleDiff !== null && angleDiff <= 90;
+                } else {
+                    // Fallback: If heading is unknown (stationary), assume we are facing the intersection
+                    // This allows the nearest intersection to be selected even without movement
+                    ahead = true;
+                }
+
                 return {
                     ...intersection,
                     lat: coords.lat,
@@ -279,18 +289,19 @@ const AmbulanceDashboard = () => {
             return;
         }
         setIsStarting(true);
-        const etaSeconds = computeEtaSeconds(nearestAhead.distance, currentPos.speed ?? 0);
         try {
+            // If heading is unknown, assume we are facing the target intersection
+            const effectiveHeading = headingDeg ?? nearestAhead.bearing ?? 0;
+            
             const payload = {
                 userId: user?.userId,
                 vehicleId,
                 lat: currentPos.lat,
                 lon: currentPos.lon,
-                heading: headingDeg ?? 0,
+                heading: effectiveHeading,
                 heading_cardinal: headingCardinal,
                 speed: currentPos.speed ?? 0,
-                distance_m: nearestAhead.distance,
-                eta_seconds: etaSeconds
+                distance_m: nearestAhead.distance
             };
             const response = await startEmergency(payload);
             setBackendResponse(response);
@@ -388,14 +399,12 @@ const AmbulanceDashboard = () => {
                                     <p className="text-xs text-slate-400 uppercase tracking-wide">Longitude</p>
                                     <p className="font-mono text-lg">{telemetry?.lon || '--'}</p>
                                 </div>
-                                <div className="bg-slate-900/50 rounded-2xl p-4 border border-slate-700">
-                                    <p className="text-xs text-slate-400 uppercase tracking-wide">Speed (m/s)</p>
-                                    <p className="font-mono text-lg">{telemetry?.speed || '0.00'}</p>
-                                </div>
-                                <div className="bg-slate-900/50 rounded-2xl p-4 border border-slate-700">
-                                    <p className="text-xs text-slate-400 uppercase tracking-wide">Heading</p>
+                                <div className="bg-slate-900/50 rounded-2xl p-4 border border-slate-700 col-span-2">
+                                    <p className="text-xs text-slate-400 uppercase tracking-wide">Heading Direction</p>
                                     <p className="font-mono text-lg">
-                                        {headingDeg !== null ? `${headingDeg.toFixed(0)}°` : '--'} ({headingCardinal})
+                                        {headingCardinal !== '--' 
+                                            ? headingCardinal 
+                                            : (nearestAhead ? headingToCardinal(nearestAhead.bearing) : 'Unknown')}
                                     </p>
                                 </div>
                             </div>
@@ -455,12 +464,6 @@ const AmbulanceDashboard = () => {
                                 <div>
                                     <p className="text-slate-400 text-xs uppercase">Queue Position</p>
                                     <p className="font-semibold">{driverStatus?.queuePosition ?? '--'}</p>
-                                </div>
-                                <div>
-                                    <p className="text-slate-400 text-xs uppercase">ETA</p>
-                                    <p className="font-semibold">
-                                        {driverStatus?.eta ? `${driverStatus.eta.toFixed(1)} s` : '--'}
-                                    </p>
                                 </div>
                                 <div>
                                     <p className="text-slate-400 text-xs uppercase">Remaining</p>
@@ -572,9 +575,9 @@ const AmbulanceDashboard = () => {
                                 </p>
                             </div>
                             <div>
-                                <p className="text-slate-400 text-xs uppercase">ETA</p>
+                                <p className="text-slate-400 text-xs uppercase">Remaining</p>
                                 <p className="font-semibold">
-                                    {backendResponse.eta ? `${backendResponse.eta.toFixed(1)} s` : '--'}
+                                    {backendResponse.remainingSeconds ? `${Math.round(backendResponse.remainingSeconds)} s` : '--'}
                                 </p>
                             </div>
                             <div>

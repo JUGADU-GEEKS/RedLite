@@ -1,8 +1,7 @@
 const EARTH_RADIUS_METERS = 6371000;
-const CARDINALS = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'];
+// Simplified to 4 main directions to avoid confusion
+const CARDINALS = ['North', 'East', 'South', 'West'];
 const CARDINAL_SLICE = 360 / CARDINALS.length;
-const SPEED_THRESHOLD_MPS = 0.2777777777777778; // 1 km/h
-const MIN_SPEED_FALLBACK = 1.5; // m/s fallback per requirements
 
 const toRadians = (deg) => (deg * Math.PI) / 180;
 
@@ -70,17 +69,5 @@ export const deriveHeadingDeg = (currentPos, lastPos) => {
     return calculateBearingDeg(lastPos.lat, lastPos.lon, currentPos.lat, currentPos.lon);
   }
   return null;
-};
-
-export const effectiveSpeed = (speedMps) => {
-  if (!speedMps || speedMps <= SPEED_THRESHOLD_MPS) {
-    return MIN_SPEED_FALLBACK;
-  }
-  return speedMps;
-};
-
-export const computeEtaSeconds = (distanceMeters, speedMps) => {
-  if (!distanceMeters || distanceMeters <= 0) return 0;
-  return distanceMeters / effectiveSpeed(speedMps);
 };
 
