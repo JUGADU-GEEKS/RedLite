@@ -61,6 +61,7 @@ def heartbeat(
 
 @router.post("/stop")
 def stop_emergency(
+    data: dict = Body(None),
     current_user: dict = Depends(require_ambulance_auth)
 ):
     """
@@ -68,6 +69,22 @@ def stop_emergency(
     """
     success = emergency_service.stop_override(current_user["userId"])
     return {"status": "stopped", "success": success}
+
+@router.get("/status")
+def driver_status(
+    current_user: dict = Depends(require_ambulance_auth)
+):
+    """
+    Real-time status for the authenticated ambulance driver.
+    """
+    return emergency_service.get_driver_status(current_user["userId"])
+
+@router.get("/overview", dependencies=[Depends(require_role(["admin"]))])
+def overrides_overview():
+    """
+    Admin snapshot of all current emergency overrides.
+    """
+    return emergency_service.get_override_overview()
 
 @router.get("/intersections")
 def list_intersections(

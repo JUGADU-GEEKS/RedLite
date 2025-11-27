@@ -1,8 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { getToken } from '../services/auth';
 import Navbar from '../components/Navbar';
 import { MapPin, UserPlus, Radio, Activity, CheckCircle, AlertCircle } from 'lucide-react';
+import { getEmergencyOverview } from '../services/emergency';
+import { haversineDistanceMeters } from '../utils/geo';
 
 const API_URL = 'http://localhost:8000';
 
@@ -19,6 +21,12 @@ const IntersectionsAdmin = () => {
     });
     const [assignEmployee, setAssignEmployee] = useState({ intersectionId: '', employeeId: '' });
     const [registerDevice, setRegisterDevice] = useState({ intersectionId: '', iotDeviceId: '' });
+    const [devicePosition, setDevicePosition] = useState(null);
+    const [deviceError, setDeviceError] = useState('');
+    const [distanceRows, setDistanceRows] = useState([]);
+    const [overrideOverview, setOverrideOverview] = useState([]);
+    const [settingIntersection, setSettingIntersection] = useState('');
+    const watchIdRef = useRef(null);
 
     const fetchIntersections = async () => {
         const token = getToken();
@@ -38,6 +46,99 @@ const IntersectionsAdmin = () => {
     useEffect(() => {
         fetchIntersections();
     }, []);
+
+    useEffect(() => {
+        if (!navigator.geolocation) {
+            setDeviceError('Geolocation is not supported on this device.');
+            return;
+        }
+        watchIdRef.current = navigator.geolocation.watchPosition(
+            (position) => {
+                setDevicePosition({
+                    lat: position.coords.latitude,
+                    lon: position.coords.longitude,
+                    accuracy: position.coords.accuracy,
+                    ts: position.timestamp || Date.now()
+                });
+                setDeviceError('');
+            },
+            (error) => {
+                console.error(error);
+                setDeviceError(error.message || 'Unable to read device location.');
+            },
+            {
+                enableHighAccuracy: true,
+                maximumAge: 0,
+                timeout: 5000
+            }
+        );
+        return () => {
+            if (watchIdRef.current) {
+                navigator.geolocation.clearWatch(watchIdRef.current);
+                watchIdRef.current = null;
+            }
+        };
+    }, []);
+
+    useEffect(() => {
+        let cancelled = false;
+        const pullOverview = async () => {
+            try {
+                const data = await getEmergencyOverview();
+                if (!cancelled) {
+                    setOverrideOverview(data || []);
+                }
+            } catch (error) {
+                console.error('Failed to load override overview', error);
+            }
+        };
+        pullOverview();
+        const interval = setInterval(pullOverview, 5000);
+        return () => {
+            cancelled = true;
+            clearInterval(interval);
+        };
+    }, []);
+
+    useEffect(() => {
+        if (!devicePosition || intersections.length === 0) {
+            setDistanceRows([]);
+            return;
+        }
+        const overviewById = overrideOverview.reduce((acc, item) => {
+            if (item?.intersectionId) {
+                acc[item.intersectionId] = item;
+            }
+            return acc;
+        }, {});
+        const rows = intersections
+            .map((intersection) => {
+                const coords = intersection.coordinates || {};
+                if (typeof coords.lat !== 'number' || typeof coords.lon !== 'number') {
+                    return null;
+                }
+                const distance = haversineDistanceMeters(
+                    devicePosition.lat,
+                    devicePosition.lon,
+                    coords.lat,
+                    coords.lon
+                );
+                const overrideInfo = overviewById[intersection.intersectionId];
+                return {
+                    intersectionId: intersection.intersectionId,
+                    name: intersection.name,
+                    lat: coords.lat,
+                    lon: coords.lon,
+                    distance,
+                    eta: overrideInfo?.ownerEta ?? null,
+                    overrideStatus: overrideInfo?.status ?? null,
+                    queueLength: overrideInfo?.queue?.length ?? 0
+                };
+            })
+            .filter(Boolean)
+            .sort((a, b) => a.distance - b.distance);
+        setDistanceRows(rows);
+    }, [devicePosition, intersections, overrideOverview]);
 
     const handleGetLocation = () => {
         if (navigator.geolocation) {
@@ -63,6 +164,38 @@ const IntersectionsAdmin = () => {
             );
         } else {
             setMsg({ type: 'error', text: '❌ Geolocation is not supported by this browser.' });
+        }
+    };
+
+    const handleSetIntersectionCoords = async (intersectionId) => {
+        if (!devicePosition) {
+            setMsg({ type: 'error', text: 'Device location is not ready yet.' });
+            return;
+        }
+        setSettingIntersection(intersectionId);
+        const token = getToken();
+        try {
+            const res = await fetch(`${API_URL}/intersections/${intersectionId}/set_coordinates`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify({
+                    lat: devicePosition.lat,
+                    lon: devicePosition.lon
+                })
+            });
+            if (!res.ok) {
+                const err = await res.json().catch(() => ({}));
+                throw new Error(err.detail || err.message || 'Failed to update intersection coordinates.');
+            }
+            setMsg({ type: 'success', text: `📍 ${intersectionId} updated from device location.` });
+            fetchIntersections();
+        } catch (error) {
+            setMsg({ type: 'error', text: error.message || 'Unable to update coordinates.' });
+        } finally {
+            setSettingIntersection('');
         }
     };
 
@@ -146,6 +279,126 @@ const IntersectionsAdmin = () => {
                         <span className="font-semibold">{msg.text}</span>
                     </motion.div>
                 )}
+
+                <motion.div
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.5 }}
+                    className="mb-8 grid grid-cols-1 lg:grid-cols-2 gap-6"
+                >
+                    <div className="bg-white/70 backdrop-blur p-6 rounded-3xl shadow-xl border border-white/60">
+                        <div className="flex items-center justify-between mb-4">
+                            <div className="flex items-center gap-3">
+                                <div className="p-3 bg-emerald-100 text-emerald-600 rounded-xl">
+                                    <MapPin size={24} />
+                                </div>
+                                <div>
+                                    <h3 className="text-lg font-bold text-gray-900">Device Location</h3>
+                                    <p className="text-sm text-gray-500">Live coordinates pulled from this laptop</p>
+                                </div>
+                            </div>
+                            {devicePosition && (
+                                <span className="text-xs font-semibold text-emerald-600 bg-emerald-50 px-3 py-1 rounded-full">
+                                    Updated {new Date(devicePosition.ts).toLocaleTimeString()}
+                                </span>
+                            )}
+                        </div>
+                        {deviceError ? (
+                            <div className="text-red-600 bg-red-50 border border-red-200 rounded-2xl p-3 text-sm">
+                                {deviceError}
+                            </div>
+                        ) : (
+                            <div className="grid grid-cols-2 gap-4 font-mono text-sm">
+                                <div>
+                                    <p className="text-gray-500 uppercase text-xs">Latitude</p>
+                                    <p className="text-lg">{devicePosition ? devicePosition.lat.toFixed(6) : '--'}</p>
+                                </div>
+                                <div>
+                                    <p className="text-gray-500 uppercase text-xs">Longitude</p>
+                                    <p className="text-lg">{devicePosition ? devicePosition.lon.toFixed(6) : '--'}</p>
+                                </div>
+                                <div>
+                                    <p className="text-gray-500 uppercase text-xs">Accuracy</p>
+                                    <p className="text-lg">
+                                        {devicePosition?.accuracy ? `${Math.round(devicePosition.accuracy)} m` : '--'}
+                                    </p>
+                                </div>
+                                <div>
+                                    <p className="text-gray-500 uppercase text-xs">Ready</p>
+                                    <p className="text-lg">{devicePosition ? 'Yes' : 'No'}</p>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+
+                    <div className="bg-white/70 backdrop-blur p-6 rounded-3xl shadow-xl border border-white/60">
+                        <div className="flex items-center justify-between mb-4">
+                            <div className="flex items-center gap-3">
+                                <div className="p-3 bg-blue-100 text-blue-600 rounded-xl">
+                                    <Activity size={24} />
+                                </div>
+                                <div>
+                                    <h3 className="text-lg font-bold text-gray-900">Distance Monitor</h3>
+                                    <p className="text-sm text-gray-500">Sorted by proximity to this device</p>
+                                </div>
+                            </div>
+                            <span className="text-xs text-gray-500">
+                                {distanceRows.length} intersections
+                            </span>
+                        </div>
+                        {distanceRows.length === 0 ? (
+                            <p className="text-sm text-gray-500">Waiting for GPS lock to calculate distances...</p>
+                        ) : (
+                            <div className="overflow-x-auto">
+                                <table className="min-w-full text-sm">
+                                    <thead>
+                                        <tr className="text-left text-gray-500 uppercase text-xs tracking-wide">
+                                            <th className="pb-2">ID</th>
+                                            <th className="pb-2">Distance</th>
+                                            <th className="pb-2">ETA</th>
+                                            <th className="pb-2">Status</th>
+                                            <th className="pb-2">Action</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-gray-100">
+                                        {distanceRows.map((row) => (
+                                            <tr key={row.intersectionId} className="text-gray-900">
+                                                <td className="py-2 font-semibold">{row.intersectionId}</td>
+                                                <td className="py-2">{row.distance.toFixed(1)} m</td>
+                                                <td className="py-2">{row.eta ? `${row.eta.toFixed(1)} s` : '--'}</td>
+                                                <td className="py-2">
+                                                    <span className={`px-2 py-1 rounded-full text-xs font-semibold ${
+                                                        row.overrideStatus === 'active'
+                                                            ? 'bg-red-100 text-red-600'
+                                                            : row.overrideStatus === 'scheduled'
+                                                                ? 'bg-amber-100 text-amber-600'
+                                                                : 'bg-gray-100 text-gray-600'
+                                                    }`}>
+                                                        {row.overrideStatus ? row.overrideStatus.toUpperCase() : 'IDLE'}
+                                                    </span>
+                                                </td>
+                                                <td className="py-2">
+                                                    <button
+                                                        onClick={() => handleSetIntersectionCoords(row.intersectionId)}
+                                                        disabled={settingIntersection === row.intersectionId || !devicePosition}
+                                                        className="text-xs font-semibold text-amber-600 hover:text-amber-700 disabled:text-gray-400"
+                                                    >
+                                                        {settingIntersection === row.intersectionId
+                                                            ? 'Updating...'
+                                                            : `Set current device location as intersection ${row.intersectionId}`}
+                                                    </button>
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        )}
+                        <p className="text-xs text-gray-500 mt-3">
+                            ETA shows server-provided override timing. Remains “--” until an ambulance STARTs an override.
+                        </p>
+                    </div>
+                </motion.div>
 
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                     {/* Left Column: Forms */}

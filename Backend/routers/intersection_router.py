@@ -47,6 +47,28 @@ def register_device(intersection_id: str, iot_device_id: str = Body(..., embed=T
         raise HTTPException(status_code=400, detail="Failed to register device")
     return {"status": "success", "message": f"Device {iot_device_id} registered to intersection {intersection_id}"}
 
+@router.post("/intersections/{intersection_id}/set_coordinates", dependencies=[Depends(require_role(["admin"]))])
+def set_intersection_coordinates(intersection_id: str, payload: dict = Body(...)):
+    lat = payload.get("lat")
+    lon = payload.get("lon")
+    if lat is None or lon is None:
+        raise HTTPException(status_code=400, detail="Latitude and longitude are required")
+    try:
+        lat_val = float(lat)
+        lon_val = float(lon)
+    except (TypeError, ValueError):
+        raise HTTPException(status_code=400, detail="Invalid coordinate values")
+
+    if not (-90 <= lat_val <= 90) or not (-180 <= lon_val <= 180):
+        raise HTTPException(status_code=400, detail="Coordinates out of range")
+
+    intersection_service.update_coordinates_for_intersection(intersection_id, lat_val, lon_val)
+    return {
+        "status": "success",
+        "message": f"Intersection {intersection_id} coordinates updated",
+        "coordinates": {"lat": lat_val, "lon": lon_val}
+    }
+
 @router.get("/intersections/{intersection_id}/device")
 def get_device_details(intersection_id: str):
     device_details = intersection_service.get_device_for_intersection(intersection_id)
