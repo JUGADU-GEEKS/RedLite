@@ -1,5 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { motion } from 'framer-motion';
+import { MapPin, Activity, CheckCircle, AlertCircle } from 'lucide-react';
 import Navbar from '../components/Navbar';
+import AmbulanceMap from '../components/AmbulanceMap';
 import {
     startEmergency,
     sendHeartbeat,
@@ -189,7 +192,7 @@ const AmbulanceDashboard = () => {
                 }
                 const distance = haversineDistanceMeters(pos.lat, pos.lon, coords.lat, coords.lon);
                 const bearing = calculateBearingDeg(pos.lat, pos.lon, coords.lat, coords.lon);
-                
+
                 let ahead = false;
                 let angleDiff = null;
 
@@ -197,8 +200,6 @@ const AmbulanceDashboard = () => {
                     angleDiff = angleDifferenceDeg(pos.headingDeg, bearing);
                     ahead = angleDiff !== null && angleDiff <= 90;
                 } else {
-                    // Fallback: If heading is unknown (stationary), assume we are facing the intersection
-                    // This allows the nearest intersection to be selected even without movement
                     ahead = true;
                 }
 
@@ -290,9 +291,8 @@ const AmbulanceDashboard = () => {
         }
         setIsStarting(true);
         try {
-            // If heading is unknown, assume we are facing the target intersection
             const effectiveHeading = headingDeg ?? nearestAhead.bearing ?? 0;
-            
+
             const payload = {
                 userId: user?.userId,
                 vehicleId,
@@ -357,242 +357,219 @@ const AmbulanceDashboard = () => {
         }
         : null;
 
-    return (
-        <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 text-white">
-            <Navbar />
-            <div className="pt-24 px-6 max-w-6xl mx-auto pb-12 space-y-6">
-                <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-6">
-                    <div>
-                        <h1 className="text-4xl font-black tracking-tight">Ambulance Dashboard</h1>
-                        <p className="text-slate-300">
-                            Real-time GPS telemetry, intersection intelligence, and override control.
-                        </p>
-                    </div>
-                    <div className={`px-4 py-2 rounded-full font-semibold text-sm uppercase tracking-widest ${isActive ? 'bg-red-600/20 text-red-300 animate-pulse' : 'bg-emerald-600/20 text-emerald-300'}`}>
-                        {isActive ? 'Emergency Signal Active' : 'System Standby'}
-                    </div>
-                </div>
+    const normalizedCurrentPos = currentPos
+      ? {
+          lat: Number(currentPos.lat ?? currentPos.latitude ?? currentPos.latitude_deg ?? currentPos.latDeg),
+          lon: Number(currentPos.lon ?? currentPos.lng ?? currentPos.longitude ?? currentPos.lon),
+          headingDeg: Number(currentPos.headingDeg ?? headingDeg ?? currentPos.heading ?? 0),
+          speed: Number(currentPos.speed ?? 0),
+        }
+      : null;
 
+    const normalizedIntersections = (annotatedIntersections && annotatedIntersections.length)
+      ? annotatedIntersections.map(ix => ({
+          ...ix,
+          lat: Number(ix.lat ?? ix.latitude ?? ix.lat_deg ?? ix.latDeg),
+          lon: Number(ix.lon ?? ix.lng ?? ix.longitude ?? ix.lon),
+        }))
+      : (intersections || []).map(ix => ({
+          ...ix,
+          lat: Number(ix.lat ?? ix.latitude ?? ix.lat_deg ?? ix.latDeg),
+          lon: Number(ix.lon ?? ix.lng ?? ix.longitude ?? ix.lon),
+        }));
+
+    return (
+        <div className="min-h-screen bg-gradient-to-br from-amber-50 via-orange-50 to-yellow-50 relative overflow-hidden">
+            {/* decorative orbs */}
+            <div className="absolute top-10 left-10 w-96 h-96 bg-gradient-to-br from-amber-200/20 to-orange-200/20 rounded-full blur-3xl"></div>
+            <div className="absolute top-40 right-20 w-80 h-80 bg-gradient-to-br from-yellow-200/20 to-amber-200/20 rounded-full blur-3xl"></div>
+            <div className="absolute bottom-20 left-1/4 w-72 h-72 bg-gradient-to-br from-orange-200/20 to-red-200/20 rounded-full blur-3xl"></div>
+
+            <Navbar />
+
+            <div className="pt-28 px-6 max-w-7xl mx-auto pb-12 relative z-10">
+                <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.45 }} className="mb-10">
+                    <h1 className="text-5xl md:text-6xl font-bold mb-2 bg-gradient-to-r from-amber-600 via-orange-500 to-yellow-600 bg-clip-text text-transparent font-serif">
+                        Ambulance Dashboard
+                    </h1>
+                    <div className="w-24 h-1 bg-gradient-to-r from-amber-500 to-orange-500 rounded-full mb-4"></div>
+                    <p className="text-lg text-gray-700">Real-time GPS telemetry, intersection intelligence, and override control.</p>
+                </motion.div>
+
+                {/* Small status / debug */}
                 {geoError && (
-                    <div className="bg-red-500/10 border border-red-500/40 text-red-200 px-4 py-3 rounded-xl">
-                        {geoError}
+                    <div className="mb-4 p-4 rounded-2xl bg-red-50 border border-red-200 text-red-700">
+                        <AlertCircle size={18} className="inline-block mr-2 align-middle" /> <span>{geoError}</span>
                     </div>
                 )}
 
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                    <div className="lg:col-span-2 space-y-6">
-                        <div className="bg-slate-800/70 border border-slate-700 rounded-3xl p-6 space-y-4">
-                            <div className="flex items-center justify-between">
-                                <h2 className="text-xl font-semibold">Vehicle Telemetry</h2>
-                                {!warmupComplete && (
-                                    <span className="text-amber-300 text-sm font-mono">
-                                        Warm-up: {warmupCountdown.toFixed(0)}s
-                                    </span>
-                                )}
-                            </div>
-                            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                                <div className="bg-slate-900/50 rounded-2xl p-4 border border-slate-700">
-                                    <p className="text-xs text-slate-400 uppercase tracking-wide">Latitude</p>
-                                    <p className="font-mono text-lg">{telemetry?.lat || '--'}</p>
+                <div className="mb-8 grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <div className="bg-white/70 backdrop-blur p-6 rounded-3xl shadow-xl border border-white/60">
+                        <div className="flex items-center justify-between mb-4">
+                            <div className="flex items-center gap-3">
+                                <div className="p-3 bg-emerald-100 text-emerald-600 rounded-xl">
+                                    <MapPin size={24} />
                                 </div>
-                                <div className="bg-slate-900/50 rounded-2xl p-4 border border-slate-700">
-                                    <p className="text-xs text-slate-400 uppercase tracking-wide">Longitude</p>
-                                    <p className="font-mono text-lg">{telemetry?.lon || '--'}</p>
-                                </div>
-                                <div className="bg-slate-900/50 rounded-2xl p-4 border border-slate-700 col-span-2">
-                                    <p className="text-xs text-slate-400 uppercase tracking-wide">Heading Direction</p>
-                                    <p className="font-mono text-lg">
-                                        {headingCardinal !== '--' 
-                                            ? headingCardinal 
-                                            : (nearestAhead ? headingToCardinal(nearestAhead.bearing) : 'Unknown')}
-                                    </p>
+                                <div>
+                                    <h3 className="text-lg font-bold text-gray-900">Device Location</h3>
+                                    <p className="text-sm text-gray-500">Live coordinates from this device</p>
                                 </div>
                             </div>
-                            <div className="flex flex-col md:flex-row gap-3">
-                                {warmupComplete ? (
-                                    <button
-                                        onClick={handleStart}
-                                        disabled={isActive || isStarting || !nearestAhead}
-                                        className={`flex-1 py-3 rounded-2xl font-semibold transition-all ${
-                                            isActive || isStarting || !nearestAhead
-                                                ? 'bg-slate-700 text-slate-400 cursor-not-allowed'
-                                                : 'bg-emerald-500 hover:bg-emerald-400 text-slate-900 shadow-lg shadow-emerald-500/30'
-                                        }`}
-                                    >
-                                        {isStarting ? 'Requesting...' : 'Start Emergency'}
-                                    </button>
-                                ) : (
-                                    <div className="flex-1 py-3 rounded-2xl bg-slate-700 text-slate-400 text-center font-semibold">
-                                        Initializing sensors...
-                                    </div>
-                                )}
-                                {isActive && (
-                                    <button
-                                        onClick={handleStop}
-                                        disabled={isStopping}
-                                        className="flex-1 py-3 rounded-2xl font-semibold bg-red-500/80 hover:bg-red-500 text-white shadow-lg shadow-red-500/30 transition-all"
-                                    >
-                                        {isStopping ? 'Stopping...' : 'Stop Override'}
-                                    </button>
-                                )}
-                            </div>
-                            {nearestAhead && (
-                                <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-2xl p-4 text-sm text-emerald-200">
-                                    Nearest ahead: <span className="font-semibold">{nearestAhead.intersectionId}</span>{' '}
-                                    ({nearestAhead.name || 'Unnamed'}) · {nearestAhead.distance.toFixed(1)} m · Angle Δ{' '}
-                                    {nearestAhead.angleDiff?.toFixed(1)}°
-                                </div>
-                            )}
+                            <span className={`text-xs font-semibold px-3 py-1 rounded-full ${isActive ? 'bg-red-100 text-red-700' : 'bg-emerald-50 text-emerald-700'}`}>
+                                {isActive ? 'Emergency Active' : 'System Standby'}
+                            </span>
                         </div>
 
-                        <div className="bg-slate-800/70 border border-slate-700 rounded-3xl p-6">
-                            <div className="flex items-center justify-between mb-4">
-                                <h3 className="text-lg font-semibold">Override Status</h3>
-                                <span className="text-xs uppercase tracking-widest text-slate-400">
-                                    {driverStatus?.status?.toUpperCase() || 'IDLE'}
-                                </span>
+                        <div className="grid grid-cols-2 gap-4 font-mono text-sm">
+                            <div>
+                                <p className="text-gray-500 uppercase text-xs">Latitude</p>
+                                <p className="text-lg">{telemetry?.lat || '--'}</p>
                             </div>
-                            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-                                <div>
-                                    <p className="text-slate-400 text-xs uppercase">Intersection</p>
-                                    <p className="font-semibold">{driverStatus?.intersectionId || '--'}</p>
-                                </div>
-                                <div>
-                                    <p className="text-slate-400 text-xs uppercase">Lane</p>
-                                    <p className="font-semibold">{driverStatus?.targetLane?.toUpperCase() || '--'}</p>
-                                </div>
-                                <div>
-                                    <p className="text-slate-400 text-xs uppercase">Queue Position</p>
-                                    <p className="font-semibold">{driverStatus?.queuePosition ?? '--'}</p>
-                                </div>
-                                <div>
-                                    <p className="text-slate-400 text-xs uppercase">Remaining</p>
-                                    <p className="font-semibold">
-                                        {driverStatus?.remainingSeconds
-                                            ? `${Math.max(0, Math.round(driverStatus.remainingSeconds))} s`
-                                            : '--'}
-                                    </p>
-                                </div>
-                                <div>
-                                    <p className="text-slate-400 text-xs uppercase">Request ID</p>
-                                    <p className="font-mono text-xs break-all">{driverStatus?.requestId || '--'}</p>
-                                </div>
+                            <div>
+                                <p className="text-gray-500 uppercase text-xs">Longitude</p>
+                                <p className="text-lg">{telemetry?.lon || '--'}</p>
+                            </div>
+                            <div>
+                                <p className="text-gray-500 uppercase text-xs">Heading</p>
+                                <p className="text-lg">{headingCardinal !== '--' ? headingCardinal : (nearestAhead ? headingToCardinal(nearestAhead.bearing) : 'Unknown')}</p>
+                            </div>
+                            <div>
+                                <p className="text-gray-500 uppercase text-xs">Speed (m/s)</p>
+                                <p className="text-lg">{telemetry?.speed ?? '--'}</p>
                             </div>
                         </div>
 
-                        <div className="bg-slate-950 rounded-3xl p-4 font-mono text-xs h-48 overflow-y-auto border border-slate-800">
-                            {logs.length === 0 ? (
-                                <p className="text-slate-500">System logs will appear here...</p>
+                        <div className="mt-4 flex gap-3">
+                            {warmupComplete ? (
+                                <button
+                                    onClick={handleStart}
+                                    disabled={isActive || isStarting || !nearestAhead}
+                                    className={`flex-1 py-3 rounded-2xl font-semibold transition-all ${
+                                        isActive || isStarting || !nearestAhead
+                                            ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                                            : 'bg-amber-500 hover:bg-amber-400 text-white shadow-lg'
+                                    }`}
+                                >
+                                    {isStarting ? 'Requesting...' : 'Start Emergency'}
+                                </button>
                             ) : (
-                                logs.map((log, idx) => <div key={idx}>{log}</div>)
+                                <div className="flex-1 py-3 rounded-2xl bg-gray-100 text-gray-500 text-center font-semibold">
+                                    Initializing sensors... {warmupCountdown}s
+                                </div>
                             )}
+
+                            {isActive && (
+                                <button
+                                    onClick={handleStop}
+                                    disabled={isStopping}
+                                    className="py-3 px-6 rounded-2xl font-semibold bg-red-500 hover:bg-red-600 text-white shadow-lg"
+                                >
+                                    {isStopping ? 'Stopping...' : 'Stop Override'}
+                                </button>
+                            )}
+                        </div>
+
+                        {nearestAhead && (
+                            <div className="mt-4 bg-emerald-50 border border-emerald-100 rounded-xl p-3 text-sm text-emerald-800">
+                                Nearest ahead: <span className="font-semibold">{nearestAhead.intersectionId}</span> ({nearestAhead.name || 'Unnamed'}) · {nearestAhead.distance.toFixed(1)} m · Δ {nearestAhead.angleDiff?.toFixed(1)}°
+                            </div>
+                        )}
+                    </div>
+
+                    <div className="bg-white/70 backdrop-blur p-6 rounded-3xl shadow-xl border border-white/60">
+                        <div className="flex items-center justify-between mb-4">
+                            <div className="flex items-center gap-3">
+                                <div className="p-3 bg-blue-100 text-blue-600 rounded-xl">
+                                    <Activity size={24} />
+                                </div>
+                                <div>
+                                    <h3 className="text-lg font-bold text-gray-900">Live Overview</h3>
+                                    <p className="text-sm text-gray-500">Telemetry & override snapshot</p>
+                                </div>
+                            </div>
+                            <span className="text-xs text-gray-500">{annotatedIntersections.length} intersections</span>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-4">
+                            <div className="bg-white p-3 rounded-xl border">
+                                <p className="text-xs text-gray-500">Current Override</p>
+                                <p className="font-bold text-gray-900">{driverStatus?.status ?? 'IDLE'}</p>
+                            </div>
+                            <div className="bg-white p-3 rounded-xl border">
+                                <p className="text-xs text-gray-500">Remaining</p>
+                                <p className="font-bold text-gray-900">{driverStatus?.remainingSeconds ? `${Math.round(driverStatus.remainingSeconds)} s` : '--'}</p>
+                            </div>
+                            <div className="col-span-2 bg-white p-3 rounded-xl border">
+                                <p className="text-xs text-gray-500">Request</p>
+                                <p className="font-mono text-sm break-all">{backendResponse?.requestId ?? '--'}</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                    <div className="lg:col-span-2 space-y-6">
+                        <div className="bg-white/60 backdrop-blur-sm p-6 rounded-3xl shadow-xl border border-white/50">
+                            <div className="flex items-center justify-between mb-4">
+                                <h3 className="text-xl font-bold text-gray-900">Live Map</h3>
+                                <div className="text-sm text-gray-500">Ambulance & intersections</div>
+                            </div>
+                            <AmbulanceMap
+                                currentPos={normalizedCurrentPos}
+                                intersections={normalizedIntersections}
+                                nearestAhead={nearestAhead}
+                                isActive={isActive}
+                                initialCenter={normalizedCurrentPos ? [normalizedCurrentPos.lat, normalizedCurrentPos.lon] : undefined}
+                            />
+                        </div>
+
+                        <div className="bg-white/60 backdrop-blur-sm p-6 rounded-3xl shadow-xl border border-white/50">
+                            <h3 className="text-lg font-bold mb-3">Activity Logs</h3>
+                            <div className="bg-gray-50 p-3 rounded-lg h-44 overflow-y-auto font-mono text-sm text-gray-700">
+                                {logs.length === 0 ? <div className="text-gray-400">System logs will appear here...</div> : logs.map((l, i) => <div key={i} className="mb-1">{l}</div>)}
+                            </div>
                         </div>
                     </div>
 
-                    <div className="bg-slate-800/70 border border-slate-700 rounded-3xl p-6">
-                        <div className="flex items-center justify-between mb-4">
-                            <h3 className="text-lg font-semibold">Intersections (Read Only)</h3>
-                            <span className="text-xs text-slate-400">
-                                Updates with each GPS reading
-                            </span>
+                    <div className="space-y-6">
+                        <div className="bg-white/60 backdrop-blur-sm p-6 rounded-3xl shadow-xl border border-white/50">
+                            <h3 className="text-lg font-bold mb-3">Controls</h3>
+                            <div className="flex flex-col gap-3">
+                                <button onClick={handleStart} className="py-3 bg-amber-500 text-white rounded-xl shadow">Start Emergency</button>
+                                <button onClick={handleStop} className="py-3 bg-white border rounded-xl">Stop Emergency</button>
+                            </div>
                         </div>
-                        <div className="space-y-3 max-h-[600px] overflow-y-auto pr-2">
-                            {annotatedIntersections.length === 0 ? (
-                                <p className="text-slate-400 text-sm">No intersections available.</p>
-                            ) : (
-                                annotatedIntersections.map((intersection) => {
+
+                        <div className="bg-white/60 backdrop-blur-sm p-6 rounded-3xl shadow-xl border border-white/50">
+                            <div className="flex items-center justify-between mb-3">
+                                <h3 className="text-lg font-bold">Nearby Intersections</h3>
+                                <span className="text-sm text-gray-500">{annotatedIntersections.length}</span>
+                            </div>
+                            <div className="space-y-3 max-h-96 overflow-y-auto">
+                                {annotatedIntersections.length === 0 ? (
+                                    <div className="text-gray-500">No intersections available.</div>
+                                ) : annotatedIntersections.map((intersection) => {
                                     const isNearest = nearestAhead && intersection.intersectionId === nearestAhead.intersectionId;
                                     return (
-                                        <div
-                                            key={intersection.intersectionId}
-                                            className={`p-4 rounded-2xl border transition-all ${
-                                                intersection.ahead
-                                                    ? isNearest
-                                                        ? 'bg-emerald-500/15 border-emerald-500/40'
-                                                        : 'bg-emerald-500/5 border-emerald-500/20'
-                                                    : 'bg-slate-900/40 border-slate-800'
-                                            }`}
-                                        >
-                                            <div className="flex items-center justify-between">
+                                        <div key={intersection.intersectionId} className="p-3 rounded-lg border bg-white">
+                                            <div className="flex justify-between items-center">
                                                 <div>
-                                                    <p className="font-semibold">
-                                                        {intersection.intersectionId}{' '}
-                                                        <span className="text-slate-400 font-normal">
-                                                            · {intersection.name || 'Unnamed'}
-                                                        </span>
-                                                    </p>
-                                                    <p className="text-xs text-slate-400 font-mono">
-                                                        {intersection.lat.toFixed(5)}, {intersection.lon.toFixed(5)}
-                                                    </p>
+                                                    <div className="font-semibold">{intersection.intersectionId} <span className="text-sm text-gray-500">· {intersection.name || 'Unnamed'}</span></div>
+                                                    <div className="text-xs text-gray-500 font-mono">{intersection.lat.toFixed(5)}, {intersection.lon.toFixed(5)}</div>
                                                 </div>
                                                 <div className="text-right">
-                                                    <p className="text-lg font-bold">{intersection.distance.toFixed(0)} m</p>
-                                                    <p className="text-xs text-slate-400">
-                                                        Δ {intersection.angleDiff?.toFixed(1) ?? '--'}° · Bearing{' '}
-                                                        {intersection.bearing?.toFixed(0) ?? '--'}°
-                                                    </p>
+                                                    <div className="font-bold">{Math.round(intersection.distance)} m</div>
+                                                    <div className="text-xs text-gray-500">Δ {intersection.angleDiff?.toFixed(1) ?? '--'}°</div>
                                                 </div>
-                                            </div>
-                                            <div className="mt-2 text-xs uppercase tracking-widest">
-                                                {intersection.ahead ? (
-                                                    <span className={`px-2 py-1 rounded-full ${isNearest ? 'bg-emerald-500 text-slate-900' : 'bg-emerald-900/60 text-emerald-200'}`}>
-                                                        Ahead
-                                                    </span>
-                                                ) : (
-                                                    <span className="px-2 py-1 rounded-full bg-slate-700 text-slate-300">
-                                                        Behind
-                                                    </span>
-                                                )}
                                             </div>
                                         </div>
                                     );
-                                })
-                            )}
+                                })}
+                            </div>
                         </div>
                     </div>
                 </div>
 
-                <div className="bg-slate-800/70 border border-slate-700 rounded-3xl p-6">
-                    <h3 className="text-lg font-semibold mb-4">Backend Response</h3>
-                    {backendResponse ? (
-                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-                            <div>
-                                <p className="text-slate-400 text-xs uppercase">Status</p>
-                                <p className="font-semibold">{backendResponse.status?.toUpperCase()}</p>
-                            </div>
-                            <div>
-                                <p className="text-slate-400 text-xs uppercase">Intersection</p>
-                                <p className="font-semibold">{backendResponse.intersectionId}</p>
-                            </div>
-                            <div>
-                                <p className="text-slate-400 text-xs uppercase">Lane</p>
-                                <p className="font-semibold">{backendResponse.targetLane?.toUpperCase() || '--'}</p>
-                            </div>
-                            <div>
-                                <p className="text-slate-400 text-xs uppercase">Distance</p>
-                                <p className="font-semibold">
-                                    {backendResponse.distance ? `${backendResponse.distance.toFixed(1)} m` : '--'}
-                                </p>
-                            </div>
-                            <div>
-                                <p className="text-slate-400 text-xs uppercase">Remaining</p>
-                                <p className="font-semibold">
-                                    {backendResponse.remainingSeconds ? `${Math.round(backendResponse.remainingSeconds)} s` : '--'}
-                                </p>
-                            </div>
-                            <div>
-                                <p className="text-slate-400 text-xs uppercase">Queue Position</p>
-                                <p className="font-semibold">{backendResponse.queuePosition ?? 0}</p>
-                            </div>
-                            <div className="md:col-span-2">
-                                <p className="text-slate-400 text-xs uppercase">Request ID</p>
-                                <p className="font-mono break-all text-xs">{backendResponse.requestId}</p>
-                            </div>
-                        </div>
-                    ) : (
-                        <p className="text-slate-400 text-sm">Waiting for override session...</p>
-                    )}
-                </div>
             </div>
         </div>
     );
