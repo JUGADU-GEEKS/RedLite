@@ -145,8 +145,8 @@ const Team = ({ }) => {
     {
       name: "Devang Singh",
       role: "Full stack Developer",
-      linkedin: "https://www.linkedin.com/in/dhruv-sharma-331379154/",
-      github: "https://github.com/dhruv0050",
+      linkedin: "https://www.linkedin.com/in/devang-singh-258476284/",
+      github: "https://github.com/devang9890",
       image: devang
     },
     {
