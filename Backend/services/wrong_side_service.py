@@ -3,6 +3,7 @@ from ultralytics import YOLO
 import os
 import numpy as np
 from typing import List, Dict, Any
+import easyocr
 from models.wrong_side import WrongSideVehicle
 from motor.motor_asyncio import AsyncIOMotorClient
 from datetime import datetime
@@ -52,6 +53,7 @@ class Track:
         self.gate_state = {"A": None, "B": None}
         self.gate_cross_events = []
         self.wrong_by_gates = False
+        self.plate_captured = False
 
     def _centroid(self, b):
         x1, y1, x2, y2 = b
@@ -97,14 +99,25 @@ class SimpleTracker:
         for tr in self.tracks:
             if tr.last_frame != frame_idx:
                 tr.mark_missed()
-        self.tracks = [t for t in self.tracks if t.misses <= MAX_MISSES]
-        return assigned
+        
+        active_tracks = []
+        lost_tracks = []
+        for t in self.tracks:
+            if t.misses <= MAX_MISSES:
+                active_tracks.append(t)
+            else:
+                lost_tracks.append(t)
+        
+        self.tracks = active_tracks
+        return assigned, lost_tracks
 
 class WrongSideService:
     def __init__(self):
         # Load models
         self.vehicle_model = YOLO("yolov8n.pt")
         self.plate_model = YOLO("model/plate.pt")
+        # Initialize EasyOCR reader
+        self.reader = easyocr.Reader(['en'], gpu=False)
 
     async def process_video(self, video_path: str, websocket=None) -> Dict[str, Any]:
         cap = cv2.VideoCapture(video_path)
@@ -159,7 +172,24 @@ class WrongSideService:
             vehicle_class_ids = {2, 3, 5, 7}  # car, motorbike, bus, truck
             detections = [tuple(map(int, b)) for b, c in zip(boxes_xyxy, classes) if int(c) in vehicle_class_ids]
 
-            tracker.update(detections, frame_idx)
+            assigned, lost_tracks = tracker.update(detections, frame_idx)
+
+            # Handle lost tracks that were wrong side but never got a plate
+            for tr in lost_tracks:
+                if tr.wrong_by_gates and not tr.plate_captured:
+                     # Save as UNREADABLE
+                     plate_number = f"UNREADABLE-{tr.id}"
+                     vehicle_entry = WrongSideVehicle(
+                        plate_number=plate_number,
+                        timestamp=datetime.now(),
+                        video_file=os.path.basename(video_path)
+                     )
+                     try:
+                        await collection.insert_one(vehicle_entry.dict())
+                        print(f"Saved wrong-way vehicle {plate_number} (Track {tr.id}) to database.")
+                     except Exception as e:
+                        print(f"DB Error: {e}")
+                     detected_plates.append(plate_number)
 
             # Gate crossing logic
             def crossed(prev_y, cur_y, line_y):
@@ -192,32 +222,74 @@ class WrongSideService:
                         if g1 == 'B' and g2 == 'A' and 0 < (f2 - f1) <= GATE_PAIR_WINDOW:
                             tr.wrong_by_gates = True
                             tr.flagged = True
-                            
-                            # Crop and detect plate
-                            veh_crop = frame[max(y1,0):min(y2,height), max(x1,0):min(x2,width)].copy()
-                            plate_results = self.plate_model(veh_crop, imgsz=DETECT_IMGSZ, conf=PLATE_CONF, verbose=False)[0]
-                            
-                            plate_number = f"UNKNOWN-{tr.id}"
-                            # Try to find a plate
-                            if len(plate_results.boxes) > 0:
-                                # Use track ID for consistent dummy plate if needed, or real OCR if implemented
-                                # For now, using the logic from previous version:
-                                plate_number = f"DL-8C-{1000 + tr.id}"
-                            
-                            # Save to DB
-                            vehicle_entry = WrongSideVehicle(
-                                plate_number=plate_number,
-                                timestamp=datetime.now(),
-                                video_file=os.path.basename(video_path)
-                            )
-                            try:
-                                await collection.insert_one(vehicle_entry.dict())
-                                print(f"Saved wrong-way vehicle {plate_number} (Track {tr.id}) to database.")
-                            except Exception as e:
-                                print(f"DB Error: {e}")
-                            
-                            detected_plates.append(plate_number)
+                            # We do NOT save immediately anymore. We wait for plate detection.
                             break
+            
+            # OCR and Saving Logic for ALL flagged tracks
+            for tr in tracker.tracks:
+                # Only try to detect plate if:
+                # 1. It is a wrong side vehicle
+                # 2. We haven't captured the plate yet
+                # 3. The vehicle was detected in the CURRENT frame (so we have a valid bbox)
+                if tr.wrong_by_gates and not tr.plate_captured and tr.last_frame == frame_idx:
+                     # Get current bbox
+                     x1, y1, x2, y2 = tr.bboxes[-1]
+                     # Crop vehicle
+                     veh_crop = frame[max(y1,0):min(y2,height), max(x1,0):min(x2,width)].copy()
+                     
+                     # Run Plate Detection
+                     plate_results = self.plate_model(veh_crop, imgsz=DETECT_IMGSZ, conf=PLATE_CONF, verbose=False)[0]
+                     
+                     if len(plate_results.boxes) > 0:
+                        # Get the best plate detection
+                        px1, py1, px2, py2 = plate_results.boxes.xyxy[0].cpu().numpy()
+                        plate_crop = veh_crop[int(py1):int(py2), int(px1):int(px2)]
+                        
+                        # Preprocessing for better OCR
+                        try:
+                            # 1. Grayscale
+                            gray_plate = cv2.cvtColor(plate_crop, cv2.COLOR_BGR2GRAY)
+                            # 2. Upscale (resize) to help with small text
+                            scale_factor = 3
+                            h, w = gray_plate.shape
+                            resized_plate = cv2.resize(gray_plate, (w * scale_factor, h * scale_factor), interpolation=cv2.INTER_CUBIC)
+                            # 3. Denoise
+                            denoised_plate = cv2.fastNlMeansDenoising(resized_plate, None, 10, 7, 21)
+
+                            # Read text using EasyOCR
+                            results = self.reader.readtext(denoised_plate, detail=1)
+                            
+                            # Filter and join results
+                            detected_texts = []
+                            for res in results:
+                                text = res[1]
+                                conf = res[2]
+                                # Only keep alphanumeric
+                                clean_text = "".join(e for e in text if e.isalnum()).upper()
+                                # Filter out very short noise (unless it's part of a sequence)
+                                if len(clean_text) >= 1 and conf > 0.2: 
+                                    detected_texts.append(clean_text)
+                            
+                            if detected_texts:
+                                plate_number = "".join(detected_texts)
+                                # Only save if we got a somewhat valid looking plate (e.g. length > 3)
+                                # This prevents saving "I" or "1" as a plate immediately
+                                if len(plate_number) > 3:
+                                    vehicle_entry = WrongSideVehicle(
+                                        plate_number=plate_number,
+                                        timestamp=datetime.now(),
+                                        video_file=os.path.basename(video_path)
+                                    )
+                                    try:
+                                        await collection.insert_one(vehicle_entry.dict())
+                                        print(f"Saved wrong-way vehicle {plate_number} (Track {tr.id}) to database.")
+                                        tr.plate_captured = True
+                                        detected_plates.append(plate_number)
+                                    except Exception as e:
+                                        print(f"DB Error: {e}")
+                                
+                        except Exception as e:
+                            print(f"OCR Error: {e}")
 
             # Visualization
             vis = frame.copy()
