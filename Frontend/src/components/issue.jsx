@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Upload, Image, Video, CheckCircle, AlertCircle, ArrowLeft } from 'lucide-react';
 import Navbar from './Navbar';
@@ -24,33 +24,16 @@ const FloatingElement = ({ children, delay = 0, duration = 3 }) => (
 
 function Issue() {
   const navigate = useNavigate();
-  const [dragActive, setDragActive] = useState(false);
   const [uploadedFile, setUploadedFile] = useState(null);
   const [filePreview, setFilePreview] = useState(null);
+  const [showCamera, setShowCamera] = useState(false);
+  const [cameraStream, setCameraStream] = useState(null);
+  const videoRef = useRef(null);
+  const canvasRef = useRef(null);
   const [coords, setCoords] = useState({ lat: null, lon: null });
   const [analyzeResult, setAnalyzeResult] = useState(null);
   const [loadingAnalyze, setLoadingAnalyze] = useState(false);
   const [error, setError] = useState(null);
-
-  const handleDrag = (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    if (e.type === "dragenter" || e.type === "dragover") {
-      setDragActive(true);
-    } else if (e.type === "dragleave") {
-      setDragActive(false);
-    }
-  };
-
-  const handleDrop = (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setDragActive(false);
-    
-    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-      handleFile(e.dataTransfer.files[0]);
-    }
-  };
 
   const handleChange = (e) => {
     e.preventDefault();
@@ -59,16 +42,65 @@ function Issue() {
     }
   };
 
+  useEffect(() => {
+    if (videoRef.current && cameraStream) {
+      try {
+        videoRef.current.srcObject = cameraStream;
+      } catch (e) {
+        console.warn('Could not set video srcObject', e);
+      }
+    }
+  }, [cameraStream]);
+
   const handleFile = (file) => {
-    if (file.type.startsWith('image/') || file.type.startsWith('video/')) {
+    // Camera-only: accept image files only
+    if (file.type && file.type.startsWith('image/')) {
       setUploadedFile(file);
-      
       // Create preview URL
       const previewUrl = URL.createObjectURL(file);
       setFilePreview(previewUrl);
     } else {
-      alert('Please upload only image or video files.');
+      alert('Please capture a photo using your camera. Only images are accepted.');
     }
+  };
+
+  // Camera helpers for desktop enforcement
+  const openCamera = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+      setCameraStream(stream);
+      setShowCamera(true);
+      if (videoRef.current) videoRef.current.srcObject = stream;
+    } catch (e) {
+      console.error('Camera open failed', e);
+      alert('Unable to access camera. Please allow camera permission or use a mobile device.');
+    }
+  };
+
+  const closeCamera = () => {
+    if (cameraStream) {
+      cameraStream.getTracks().forEach(t => t.stop());
+    }
+    setCameraStream(null);
+    setShowCamera(false);
+  };
+
+  const captureFromCamera = () => {
+    if (!videoRef.current) return;
+    const video = videoRef.current;
+    const w = video.videoWidth;
+    const h = video.videoHeight;
+    const canvas = document.createElement('canvas');
+    canvas.width = w;
+    canvas.height = h;
+    const ctx = canvas.getContext('2d');
+    ctx.drawImage(video, 0, 0, w, h);
+    canvas.toBlob((blob) => {
+      if (!blob) return;
+      const file = new File([blob], `capture_${Date.now()}.jpg`, { type: 'image/jpeg' });
+      handleFile(file);
+      closeCamera();
+    }, 'image/jpeg', 0.9);
   };
 
   // Get browser geolocation once on mount (optional, used to send lat/lon with upload)
@@ -115,6 +147,56 @@ function Issue() {
 
       const data = await res.json();
       setAnalyzeResult(data);
+
+      // If pothole detected, attempt to send report to potholes/report
+      if (data && data.pothole_detected) {
+        try {
+          // Prepare form with the same file and coords (if available)
+          const reportForm = new FormData();
+          reportForm.append('file', uploadedFile, uploadedFile.name);
+          if (coords.lat != null) reportForm.append('lat', String(coords.lat));
+          if (coords.lon != null) reportForm.append('lon', String(coords.lon));
+
+          const reportRes = await fetch(`${import.meta.env.VITE_API_URL}/potholes/report`, {
+            method: 'POST',
+            body: reportForm,
+          });
+
+          if (reportRes.ok) {
+            const reportData = await reportRes.json();
+            setAnalyzeResult(prev => ({ ...prev, report_sent: true, pothole_report: reportData }));
+          } else {
+            // If server rejects (likely due to missing EXIF on desktop captures), try IoT fallback
+            let txt = await reportRes.text();
+            console.warn('[REPORT] /potholes/report failed', reportRes.status, txt);
+            // Attempt IoT fallback if coordinates are available
+            if (coords && coords.lat != null && coords.lon != null) {
+              try {
+                const iotRes = await fetch(`${import.meta.env.VITE_API_URL}/potholes/iot`, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ lat: coords.lat, lon: coords.lon, intensity: 0.5, vehicleId: 'web-fallback' }),
+                });
+                if (iotRes.ok) {
+                  const iotData = await iotRes.json();
+                  setAnalyzeResult(prev => ({ ...prev, report_sent: true, pothole_report: iotData, fallback: 'iot' }));
+                } else {
+                  const txt2 = await iotRes.text();
+                  setAnalyzeResult(prev => ({ ...prev, report_sent: false, error_sending: txt2 || 'IoT fallback failed' }));
+                }
+              } catch (e) {
+                console.error('[REPORT] IoT fallback failed', e);
+                setAnalyzeResult(prev => ({ ...prev, report_sent: false, error_sending: e.message }));
+              }
+            } else {
+              setAnalyzeResult(prev => ({ ...prev, report_sent: false, error_sending: 'No coordinates for IoT fallback' }));
+            }
+          }
+        } catch (e) {
+          console.error('[REPORT] Failed to send report', e);
+          setAnalyzeResult(prev => ({ ...prev, report_sent: false, error_sending: e.message }));
+        }
+      }
     } catch (e) {
       console.error(e);
       setError(e.message || 'Analysis failed');
@@ -122,6 +204,57 @@ function Issue() {
       setLoadingAnalyze(false);
     }
   };
+
+  // Draw preview image and overlay pothole detections as circles
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas || !filePreview) return;
+    const img = new window.Image();
+    img.crossOrigin = 'anonymous';
+    img.src = filePreview;
+    img.onload = () => {
+      // Set canvas internal size to image size for accurate coordinates
+      canvas.width = img.naturalWidth;
+      canvas.height = img.naturalHeight;
+      const ctx = canvas.getContext('2d');
+      // Clear
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      // Draw image
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+
+      // Overlay circles for detections
+      const boxes = analyzeResult && (analyzeResult.pothole_boxes || analyzeResult.potholeBoxes || []);
+      if (boxes && boxes.length) {
+        boxes.forEach((b, idx) => {
+          // Backend may use 'bbox' or 'bbox' nested
+          const bbox = b.bbox || b.bbox || null;
+          if (!bbox || bbox.length < 4) return;
+          const [x1, y1, x2, y2] = bbox.map(Number);
+          const cx = (x1 + x2) / 2;
+          const cy = (y1 + y2) / 2;
+          const rw = Math.abs(x2 - x1);
+          const rh = Math.abs(y2 - y1);
+          const r = Math.max(rw, rh) * 0.6; // radius
+
+          // Draw translucent filled circle
+          ctx.beginPath();
+          ctx.arc(cx, cy, r, 0, 2 * Math.PI);
+          ctx.fillStyle = 'rgba(255, 69, 58, 0.18)';
+          ctx.fill();
+
+          // Draw border
+          ctx.lineWidth = Math.max(3, Math.round(Math.min(12, r * 0.06)));
+          ctx.strokeStyle = 'rgba(255,69,58,0.95)';
+          ctx.stroke();
+
+          // Label
+          ctx.fillStyle = 'rgba(255,69,58,0.95)';
+          ctx.font = `${Math.max(12, Math.round(r * 0.18))}px sans-serif`;
+          ctx.fillText(`#${idx + 1}`, cx - 6, cy - r - 8);
+        });
+      }
+    };
+  }, [filePreview, analyzeResult]);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-amber-50 via-orange-50 to-yellow-50 relative overflow-hidden">
@@ -196,62 +329,39 @@ function Issue() {
               Select Image or Video of the Issue
             </h2>
 
-            {/* File Upload Area */}
-            <div
-              className={`relative border-2 border-dashed rounded-2xl p-12 text-center transition-all duration-300 ${
-                dragActive
-                  ? 'border-amber-400 bg-amber-50/50'
-                  : 'border-gray-300 hover:border-amber-300 hover:bg-amber-50/30'
-              }`}
-              onDragEnter={handleDrag}
-              onDragLeave={handleDrag}
-              onDragOver={handleDrag}
-              onDrop={handleDrop}
-            >
-              <input
-                type="file"
-                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                onChange={handleChange}
-                accept="image/*,video/*"
-                id="file-upload"
-              />
+            {/* Camera-only capture area */}
+              <div className="relative border-2 border-dashed rounded-2xl p-12 text-center transition-all duration-300 border-gray-300 hover:border-amber-300 hover:bg-amber-50/30" onClick={(e)=>{e.preventDefault(); if(!uploadedFile) openCamera(); }}>
 
-              {uploadedFile ? (
+                  {uploadedFile ? (
                 <div className="space-y-6">
                   {/* File Preview */}
-                  <div className="flex justify-center">
-                    {uploadedFile.type.startsWith('image/') ? (
-                      <img
-                        src={filePreview}
-                        alt="Preview"
-                        className="max-w-xs max-h-48 rounded-lg shadow-lg object-cover"
-                      />
-                    ) : (
-                      <video
-                        src={filePreview}
-                        className="max-w-xs max-h-48 rounded-lg shadow-lg"
-                        controls
-                      />
-                    )}
-                  </div>
+                    <div className="flex justify-center">
+                      <canvas ref={canvasRef} className="max-w-xs max-h-48 rounded-lg shadow-lg object-cover" />
+                    </div>
                   
                   <div className="flex items-center justify-center space-x-3 text-green-600">
                     <CheckCircle className="w-6 h-6" />
                     <span className="font-medium">{uploadedFile.name}</span>
                   </div>
                   
-                  <button
-                    onClick={() => {
-                      setUploadedFile(null);
-                      setFilePreview(null);
-                    }}
-                    className="px-6 py-2 bg-gray-200 hover:bg-gray-300 rounded-lg transition-colors duration-200"
-                  >
-                    Remove File
-                  </button>
+                  <div className="flex items-center justify-center space-x-3">
+                    <button
+                      onClick={() => {
+                        setUploadedFile(null);
+                        setFilePreview(null);
+                        // clear canvas
+                        const c = canvasRef.current;
+                        if (c) { const ctx = c.getContext('2d'); ctx && ctx.clearRect(0,0,c.width,c.height); }
+                      }}
+                      className="px-6 py-2 bg-gray-200 hover:bg-gray-300 rounded-lg transition-colors duration-200"
+                    >
+                      Remove Photo
+                    </button>
+                    <button onClick={openCamera} className="px-6 py-2 bg-amber-500 text-white rounded-lg">Retake</button>
+                  </div>
                 </div>
               ) : (
-                <div className="space-y-6">
+                  <div className="space-y-6">
                   {/* Upload Icon */}
                   <div className="flex justify-center">
                     <div className="w-20 h-20 bg-gradient-to-br from-amber-200 via-amber-500 to-amber-50 rounded-2xl flex items-center justify-center shadow-lg">
@@ -262,12 +372,11 @@ function Issue() {
 
                   {/* Upload Text */}
                   <div className="space-y-2">
-                    <p className="text-lg font-medium text-gray-700">
-                      Click to upload media
-                    </p>
-                    <p className="text-gray-500">
-                      or drag and drop your file here
-                    </p>
+                    <p className="text-lg font-medium text-gray-700">Tap to open camera and capture a photo</p>
+                    <p className="text-gray-500">Only camera capture is allowed (no gallery uploads)</p>
+                    <div>
+                      <button onClick={(e)=>{e.stopPropagation(); openCamera();}} className="mt-3 px-6 py-3 bg-amber-500 text-white rounded-lg">Open Camera</button>
+                    </div>
                   </div>
 
                   {/* Supported Formats */}
@@ -276,14 +385,30 @@ function Issue() {
                       <Image className="w-4 h-4" />
                       <span>Images</span>
                     </div>
-                    <div className="flex items-center space-x-2">
-                      <Video className="w-4 h-4" />
-                      <span>Videos</span>
-                    </div>
+                    {/* Videos are not supported for citizen camera reports to enforce live capture */}
                   </div>
                 </div>
               )}
             </div>
+
+            {/* Camera Modal */}
+            {showCamera && (
+              <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
+                <div className="bg-white rounded-lg p-4 max-w-lg w-full">
+                  <div className="flex justify-between items-center mb-2">
+                    <h3 className="font-semibold">Camera</h3>
+                    <button onClick={closeCamera} className="text-sm text-gray-600">Close</button>
+                  </div>
+                  <div className="w-full h-80 bg-black flex items-center justify-center">
+                    <video ref={videoRef} autoPlay playsInline muted style={{width:'100%', height:'100%', objectFit:'cover'}} />
+                  </div>
+                  <div className="flex justify-center mt-3 space-x-3">
+                    <button onClick={captureFromCamera} className="px-6 py-3 bg-amber-500 text-white rounded-lg">Capture</button>
+                    <button onClick={closeCamera} className="px-6 py-3 bg-gray-200 rounded-lg">Cancel</button>
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* Submit Button */}
             {uploadedFile && (

@@ -151,6 +151,7 @@ try:
     from routers.ws_router import router as ws_router
     from routers.wrong_side_router import router as wrong_side_router
     from routers.emergency_router import router as emergency_router
+    from routers.potholes_router import router as potholes_router
     app.include_router(auth_router)
     app.include_router(admin_router)
     app.include_router(protected_router)
@@ -159,6 +160,7 @@ try:
     app.include_router(ws_router)
     app.include_router(wrong_side_router)
     app.include_router(emergency_router)
+    app.include_router(potholes_router)
     logging.info("[ROUTERS] Successfully included all routers")
     # Verify auth routes are registered
     routes = [r.path for r in app.routes]
@@ -456,6 +458,9 @@ async def analyze_issue(lat: float = Form(None), lon: float = Form(None), file: 
             cls = int(box.cls[0])
             conf = float(box.conf[0]) if hasattr(box, 'conf') else None
             label = names.get(cls, str(cls)) if isinstance(names, dict) else str(cls)
+            # Skip low-confidence detections
+            if conf is not None and conf < 0.35:
+                continue
             # Consider 'pothole' label or class id 0 as pothole (fallback)
             if str(label).lower() == 'pothole' or cls == 0:
                 pothole_detected = True
@@ -502,6 +507,8 @@ async def analyze_issue(lat: float = Form(None), lon: float = Form(None), file: 
                 cls = int(box.cls[0])
                 conf = float(box.conf[0]) if hasattr(box, 'conf') else None
                 label = names.get(cls, str(cls)) if isinstance(names, dict) else str(cls)
+                if conf is not None and conf < 0.35:
+                    continue
                 if str(label).lower() == 'pothole' or cls == 0:
                     pothole_detected = True
                     x1, y1, x2, y2 = map(float, box.xyxy[0]) if hasattr(box, 'xyxy') else (0,0,0,0)
