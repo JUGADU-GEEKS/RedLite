@@ -37,6 +37,7 @@ const Navbar = ({ darkMode, toggleDarkMode }) => {
             { label: 'Home', to: '/home', onClick: () => navigate('/home') },
             { label: 'SOS', to: '/sos', onClick: () => navigate('/sos') },
             { label: 'Report issue', to: '/issue', onClick: () => navigate('/issue') },
+            { label: 'Potholes Map', to: '/potholes-map', onClick: () => navigate('/potholes-map') },
         ];
     }
 

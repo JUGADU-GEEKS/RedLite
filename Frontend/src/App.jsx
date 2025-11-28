@@ -5,6 +5,7 @@ import Landing from './components/landing';
 import Dashboard from './components/Dashboard';
 import Team from './components/team';
 import MapPage from './components/map';
+import PotholesMap from './components/PotholesMap';
 import SOS from './components/SOS';
 import Alert from './components/Alert';
 import Issue from './components/issue';
@@ -36,6 +37,7 @@ function App() {
             <Route path="/sos" element={<SOS/>} />
             <Route path="/team" element={<Team/>} />
             <Route path="/map" element={<MapPage/>} />
+            <Route path="/potholes-map" element={<PotholesMap/>} />
             <Route path="/emergency" element={<Alert/>} />
             <Route path="/issue" element={<Issue/>} />
             <Route path="/admin" element={<ProtectedRoute roles={["admin"]}><AdminAssign/></ProtectedRoute>} />
