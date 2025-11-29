@@ -152,6 +152,7 @@ try:
     from routers.wrong_side_router import router as wrong_side_router
     from routers.emergency_router import router as emergency_router
     from routers.potholes_router import router as potholes_router
+    from routers.chat_router import router as chatbot_router
     app.include_router(auth_router)
     app.include_router(admin_router)
     app.include_router(protected_router)
@@ -161,6 +162,7 @@ try:
     app.include_router(wrong_side_router)
     app.include_router(emergency_router)
     app.include_router(potholes_router)
+    app.include_router(chatbot_router)
     logging.info("[ROUTERS] Successfully included all routers")
     # Verify auth routes are registered
     routes = [r.path for r in app.routes]
@@ -654,6 +656,98 @@ async def set_current_location(request: Request):
             'status': 'error',
             'message': f'Failed to set current location: {str(e)}'
         }, status_code=500)
+
+@app.post("/chat/completions")
+async def chat_completions(request: Request):
+    """ChatGPT-like completions endpoint that uses Gemini with RAG"""
+    try:
+        from services.chatbot_service import (
+            is_traffic_related,
+            find_law_context,
+            build_prompt,
+            call_gemini
+        )
+        
+        body = await request.json()
+        messages = body.get("messages", [])
+        
+        if not messages or not isinstance(messages, list):
+            return JSONResponse(
+                {"error": "Invalid request format. Expected JSON with 'messages' field."}, 
+                status_code=400
+            )
+        
+        # Extract user message and language
+        user_message = None
+        language = "en"
+        
+        for msg in messages:
+            if isinstance(msg, dict) and msg.get("role") == "user":
+                user_message = msg.get("content", "")
+                # Try to extract language from metadata if available
+                if isinstance(msg.get("meta"), dict):
+                    language = msg["meta"].get("language", "en")
+                break
+        
+        if not user_message:
+            return JSONResponse(
+                {"error": "No user message found in the request."}, 
+                status_code=400
+            )
+        
+        # Check if traffic-related
+        if not is_traffic_related(user_message):
+            return {
+                "id": "local-gemini",
+                "choices": [{
+                    "message": {
+                        "role": "assistant",
+                        "content": "I can't help you with that."
+                    }
+                }]
+            }
+        
+        # Find contexts and build prompt
+        contexts = find_law_context(user_message)
+        
+        if not contexts:
+            return {
+                "id": "local-gemini",
+                "choices": [{
+                    "message": {
+                        "role": "assistant",
+                        "content": "I can't help you with that."
+                    }
+                }]
+            }
+        
+        prompt = build_prompt(user_message, language, contexts)
+        
+        # Call Gemini
+        gemini_response = call_gemini(prompt, temperature=0.0, language=language, contexts=contexts)
+        answer_text = gemini_response.get("text", "I can't help you with that.")
+        
+        return {
+            "id": "local-gemini",
+            "choices": [{
+                "message": {
+                    "role": "assistant",
+                    "content": answer_text
+                }
+            }]
+        }
+        
+    except Exception as e:
+        import traceback
+        tb = traceback.format_exc()
+        print("[CHAT_COMPLETIONS ERROR]", tb)
+        return JSONResponse(
+            {
+                "error": "Error processing request. See server logs.",
+                "detail": str(e)
+            },
+            status_code=500
+        )
   
 @app.get('/')
 def slash():
