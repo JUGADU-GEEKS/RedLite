@@ -5,35 +5,55 @@ import TypingIndicator from "./TypingIndicator";
 import LanguageSelector from "./LanguageSelector";
 import { sendChatMessage } from "../services/api.js";
 import { MessageCircle, X } from "lucide-react";
+import LANG from "../utils/lang.js";
 
-const Chat = ({ initialOpen = false }) => {
+const Chat = ({ initialOpen = false, userCoords = null }) => {
   const [open, setOpen] = useState(initialOpen);
   const [lang, setLang] = useState("en");
   const [input, setInput] = useState("");
   const [history, setHistory] = useState([]);
   const [loading, setLoading] = useState(false);
   const listRef = useRef();
+  const t = LANG[lang] || LANG.en;
 
   useEffect(() => {
+    const pack = LANG[lang] || LANG.en;
     if (open) {
       if (history.length === 0) {
-        setHistory([{ 
-          role: "bot", 
-          text: lang === "hi" 
-            ? "नमस्ते! ट्रैफिक नियमों के बारे में पूछें।" 
-            : (lang === "or" 
-              ? "ନମସ୍କାର! ଟ୍ରାଫିକ୍ ନିୟମ ନେଇ ପଚାରନ୍ତୁ।" 
-              : "Hello! Ask me about traffic laws, fines, and challans."), 
-          ts: Date.now() 
+        setHistory([{
+          role: "bot",
+          text: pack.greeting,
+          ts: Date.now(),
+          type: "system"
         }]);
+      } else {
+        // if first message is a system greeting, update it on language change
+        setHistory(prev => {
+          if (prev.length > 0 && prev[0]?.type === 'system') {
+            const copy = [...prev];
+            copy[0] = { ...copy[0], text: pack.greeting };
+            return copy;
+          }
+          return prev;
+        });
       }
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, lang]);
 
   useEffect(() => {
-    listRef.current?.scrollTo({ top: listRef.current.scrollHeight, behavior: "smooth" });
+    const el = listRef.current;
+    if (el) {
+      // jump to bottom when messages change
+      try {
+        el.scrollTop = el.scrollHeight;
+      } catch (e) {
+        // fallback to scrollTo if available
+        el.scrollTo && el.scrollTo({ top: el.scrollHeight });
+      }
+    }
   }, [history, loading]);
-
+  
   const send = async () => {
     if (!input.trim() || loading) return;
     const text = input.trim();
@@ -43,13 +63,11 @@ const Chat = ({ initialOpen = false }) => {
     setLoading(true);
     try {
       const resp = await sendChatMessage(text, lang);
-      const answer = resp.answer || "I can't help you with that.";
+      const answer = resp?.answer || t.error_generic;
       setHistory(prev => [...prev, { role: "bot", text: answer, ts: Date.now() }]);
     } catch (e) {
       console.error("[CHAT ERROR]", e);
-      const errorMsg = e.message?.includes("Failed") 
-        ? "Unable to connect to server. Please check your connection." 
-        : "An error occurred. Please try again.";
+      const errorMsg = e.message?.includes("Failed") ? t.error_connect : t.error_generic;
       setHistory(prev => [...prev, { role: "bot", text: errorMsg, ts: Date.now() }]);
     } finally {
       setLoading(false);
@@ -72,7 +90,8 @@ const Chat = ({ initialOpen = false }) => {
             animate={{ opacity: 1, y: 0, scale: 1 }} 
             exit={{ opacity: 0, y: 20, scale: 0.95 }}
             transition={{ duration: 0.3 }}
-            className="w-80 md:w-96 bg-white dark:bg-gray-900 backdrop-blur-xl rounded-3xl shadow-2xl border border-gray-200 dark:border-gray-700 overflow-hidden mb-3"
+            className="w-80 md:w-96 bg-white dark:bg-gray-900 backdrop-blur-xl rounded-3xl shadow-2xl border border-gray-200 dark:border-gray-700 overflow-hidden mb-3 flex flex-col"
+            style={{ height: '80vh', maxHeight: '80vh' }}
           >
             {/* Header */}
             <div className="bg-gradient-to-r from-amber-500 via-orange-500 to-yellow-500 px-5 py-4 border-b border-white/20">
@@ -102,35 +121,57 @@ const Chat = ({ initialOpen = false }) => {
               <LanguageSelector value={lang} onChange={setLang} />
             </div>
 
-            {/* Message list */}
-            <div 
-              ref={listRef} 
-              className="max-h-96 overflow-y-auto p-5 space-y-4 bg-gray-50 dark:bg-gray-900 scrollbar-thin scrollbar-thumb-gray-300 dark:scrollbar-thumb-gray-600 scrollbar-track-transparent"
-              style={{ minHeight: '300px' }}
-            >
-              {history.length === 0 ? (
-                <div className="flex items-center justify-center h-full text-gray-400 text-sm">
-                  Start a conversation...
-                </div>
-              ) : (
-                <>
-                  {history.map((m, idx) => (
-                    <MessageBubble key={idx} role={m.role} text={m.text} ts={m.ts} />
-                  ))}
-                  {loading && <TypingIndicator />}
-                </>
-              )}
+            {/* Quick suggestions based on user location */}
+            <div className="p-4 px-5 flex-shrink-0">
+              <div className="flex flex-wrap gap-2">
+                {(() => {
+                  const pack = LANG[lang] || LANG.en;
+                  const baseSuggestions = [...pack.suggestions];
+                  if (userCoords && userCoords.lat && userCoords.lon) {
+                    baseSuggestions[3] = pack.suggestion_advisory_nearby(userCoords.lat, userCoords.lon);
+                    baseSuggestions.unshift(pack.suggestion_weather_nearby(userCoords.lat, userCoords.lon));
+                  }
+                  return baseSuggestions.slice(0, 4).map((sug, i) => (
+                    <button
+                      key={i}
+                      onClick={() => { setInput(sug); setTimeout(() => send(), 50); }}
+                      className="text-xs px-3 py-1 rounded-full bg-gray-100 hover:bg-amber-100 text-gray-800"
+                    >
+                      {sug}
+                    </button>
+                  ));
+                })()}
+              </div>
             </div>
 
+            {/* Message list */}
+              <div
+                ref={listRef}
+                className="min-h-0 flex-1 overflow-y-auto p-5 space-y-4 bg-gray-50 dark:bg-gray-900 scrollbar-thin scrollbar-thumb-gray-300 dark:scrollbar-thumb-gray-600 scrollbar-track-transparent"
+              >
+                {history.length === 0 ? (
+                  <div className="flex items-center justify-center h-full text-gray-400 text-sm">
+                    {t.start_conversation}
+                  </div>
+                ) : (
+                  <>
+                    {history.map((m, idx) => (
+                      <MessageBubble key={idx} role={m.role} text={m.text} ts={m.ts} />
+                    ))}
+                    {loading && <TypingIndicator />}
+                  </>
+                )}
+              </div>
+
             {/* Input */}
-            <div className="p-4 bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700">
+              <div className="p-4 bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 flex-shrink-0">
               <div className="flex gap-2">
                 <input
                   type="text"
                   value={input}
                   onChange={(e) => setInput(e.target.value)}
                   onKeyDown={handleKeyDown}
-                  placeholder="Ask about traffic laws, fines, challans..."
+                  placeholder={t.placeholder}
                   className="flex-1 px-4 py-2.5 bg-gray-50 dark:bg-gray-700 rounded-xl border border-gray-300 dark:border-gray-600 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent text-sm text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 transition-all"
                   disabled={loading}
                   maxLength={500}
@@ -146,12 +187,12 @@ const Chat = ({ initialOpen = false }) => {
                   {loading ? (
                     <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
                   ) : (
-                    "Send"
+                    t.send
                   )}
                 </motion.button>
               </div>
               <p className="text-xs text-gray-400 dark:text-gray-500 mt-2 text-center">
-                Only traffic-related questions are supported
+                {t.greeting}
               </p>
             </div>
           </motion.div>

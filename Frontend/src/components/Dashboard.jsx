@@ -632,8 +632,8 @@ function Dashboard({ onHowItWorksClick, onHomeClick, onDashboardClick, onMapClic
         
       </div>
       
-      {/* Chat Component */}
-      <Chat />
+      {/* Chat Component - pass detected user coordinates for location-based suggestions */}
+      <Chat userCoords={locationStatus.coordinates} />
     </div>
   );
 }

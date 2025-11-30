@@ -25,6 +25,9 @@ logging.getLogger("ultralytics").setLevel(logging.WARNING)
 
 # Initialising Apps
 app = FastAPI()
+# Load environment variables early so services can read them at import time
+from dotenv import load_dotenv
+load_dotenv()
 # Enable CORS using frontend origin if provided, else allow all (dev)
 try:
     from core.config import FRONTEND_ORIGIN
@@ -291,9 +294,10 @@ LANE_VIDEO_MAP = {
 # --- Start of Call Alert Integration ---
 
 # --- Omnidim Python SDK Integration ---
-from dotenv import load_dotenv
-load_dotenv()
-from omnidimension import Client
+try:
+    from omnidimension import Client
+except Exception:
+    Client = None
 
 # Load environment variables with error handling
 API_KEY = os.getenv('API_KEY')
@@ -662,9 +666,6 @@ async def chat_completions(request: Request):
     """ChatGPT-like completions endpoint that uses Gemini with RAG"""
     try:
         from services.chatbot_service import (
-            is_traffic_related,
-            find_law_context,
-            build_prompt,
             call_gemini
         )
         
@@ -695,38 +696,10 @@ async def chat_completions(request: Request):
                 status_code=400
             )
         
-        # Check if traffic-related
-        if not is_traffic_related(user_message):
-            return {
-                "id": "local-gemini",
-                "choices": [{
-                    "message": {
-                        "role": "assistant",
-                        "content": "I can't help you with that."
-                    }
-                }]
-            }
-        
-        # Find contexts and build prompt
-        contexts = find_law_context(user_message)
-        
-        if not contexts:
-            return {
-                "id": "local-gemini",
-                "choices": [{
-                    "message": {
-                        "role": "assistant",
-                        "content": "I can't help you with that."
-                    }
-                }]
-            }
-        
-        prompt = build_prompt(user_message, language, contexts)
-        
-        # Call Gemini
-        gemini_response = call_gemini(prompt, temperature=0.0, language=language, contexts=contexts)
-        answer_text = gemini_response.get("text", "I can't help you with that.")
-        
+        # Forward the provided user message to the Gemini-backed service
+        gemini_response = call_gemini(user_message, temperature=0.0, language=language)
+        answer_text = gemini_response.get("text", "")
+
         return {
             "id": "local-gemini",
             "choices": [{
