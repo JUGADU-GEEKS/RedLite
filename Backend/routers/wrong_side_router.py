@@ -31,10 +31,19 @@ async def upload_wrong_side_video(
 async def wrong_side_websocket(websocket: WebSocket, filename: str):
     await websocket.accept()
     
-    # Construct path (matching the upload logic)
-    video_path = os.path.join("temp_uploads", f"temp_{filename}")
+    # Check if it's the static demo file
+    if filename == "wrongside.mp4":
+        # Look in Backend/Videos
+        base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        video_path = os.path.join(base_dir, "Videos", filename)
+        is_temp = False
+    else:
+        # Construct path (matching the upload logic)
+        video_path = os.path.join("temp_uploads", f"temp_{filename}")
+        is_temp = True
     
     if not os.path.exists(video_path):
+        print(f"File not found: {video_path}")
         await websocket.close(code=1000, reason="File not found")
         return
 
@@ -56,8 +65,8 @@ async def wrong_side_websocket(websocket: WebSocket, filename: str):
         except:
             pass
     finally:
-        # Clean up
-        if os.path.exists(video_path):
+        # Clean up only if it was a temp file
+        if is_temp and os.path.exists(video_path):
             os.remove(video_path)
         try:
             await websocket.close()

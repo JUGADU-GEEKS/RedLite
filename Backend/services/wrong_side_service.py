@@ -54,6 +54,7 @@ class Track:
         self.gate_cross_events = []
         self.wrong_by_gates = False
         self.plate_captured = False
+        self.ocr_in_progress = False
 
     def _centroid(self, b):
         x1, y1, x2, y2 = b
@@ -118,6 +119,72 @@ class WrongSideService:
         self.plate_model = YOLO("model/plate.pt")
         # Initialize EasyOCR reader
         self.reader = easyocr.Reader(['en'], gpu=False)
+
+    async def _run_ocr_task(self, veh_crop, tr, video_path, detected_plates):
+        """
+        Runs OCR in a separate thread to avoid blocking the main video loop.
+        """
+        def blocking_ocr_logic():
+            try:
+                # Run Plate Detection (YOLO is fast, but we can include it here or outside)
+                # Since we passed the crop, we run plate detection here
+                plate_results = self.plate_model(veh_crop, imgsz=DETECT_IMGSZ, conf=PLATE_CONF, verbose=False)[0]
+                
+                if len(plate_results.boxes) == 0:
+                    return None
+
+                # Get the best plate detection
+                px1, py1, px2, py2 = plate_results.boxes.xyxy[0].cpu().numpy()
+                plate_crop = veh_crop[int(py1):int(py2), int(px1):int(px2)]
+                
+                # Preprocessing
+                gray_plate = cv2.cvtColor(plate_crop, cv2.COLOR_BGR2GRAY)
+                scale_factor = 3
+                h, w = gray_plate.shape
+                resized_plate = cv2.resize(gray_plate, (w * scale_factor, h * scale_factor), interpolation=cv2.INTER_CUBIC)
+                denoised_plate = cv2.fastNlMeansDenoising(resized_plate, None, 10, 7, 21)
+
+                # Read text using EasyOCR (This is the slow part)
+                results = self.reader.readtext(denoised_plate, detail=1)
+                
+                detected_texts = []
+                for res in results:
+                    text = res[1]
+                    conf = res[2]
+                    clean_text = "".join(e for e in text if e.isalnum()).upper()
+                    if len(clean_text) >= 1 and conf > 0.2: 
+                        detected_texts.append(clean_text)
+                
+                if detected_texts:
+                    return "".join(detected_texts)
+                return None
+            except Exception as e:
+                print(f"OCR Logic Error: {e}")
+                return None
+
+        try:
+            # Run the blocking logic in a thread
+            plate_number = await asyncio.to_thread(blocking_ocr_logic)
+            
+            if plate_number and len(plate_number) > 3:
+                # Save to DB (async)
+                vehicle_entry = WrongSideVehicle(
+                    plate_number=plate_number,
+                    timestamp=datetime.now(),
+                    video_file=os.path.basename(video_path)
+                )
+                try:
+                    await collection.insert_one(vehicle_entry.dict())
+                    print(f"Saved wrong-way vehicle {plate_number} (Track {tr.id}) to database.")
+                    tr.plate_captured = True
+                    detected_plates.append(plate_number)
+                except Exception as e:
+                    print(f"DB Error: {e}")
+        except Exception as e:
+            print(f"OCR Task Wrapper Error: {e}")
+        finally:
+            # Always release the lock so we can try again if needed
+            tr.ocr_in_progress = False
 
     async def process_video(self, video_path: str, websocket=None) -> Dict[str, Any]:
         cap = cv2.VideoCapture(video_path)
@@ -231,65 +298,20 @@ class WrongSideService:
                 # 1. It is a wrong side vehicle
                 # 2. We haven't captured the plate yet
                 # 3. The vehicle was detected in the CURRENT frame (so we have a valid bbox)
-                if tr.wrong_by_gates and not tr.plate_captured and tr.last_frame == frame_idx:
+                # 4. OCR is not already running for this vehicle
+                if tr.wrong_by_gates and not tr.plate_captured and tr.last_frame == frame_idx and not tr.ocr_in_progress:
                      # Get current bbox
                      x1, y1, x2, y2 = tr.bboxes[-1]
                      # Crop vehicle
                      veh_crop = frame[max(y1,0):min(y2,height), max(x1,0):min(x2,width)].copy()
                      
-                     # Run Plate Detection
-                     plate_results = self.plate_model(veh_crop, imgsz=DETECT_IMGSZ, conf=PLATE_CONF, verbose=False)[0]
+                     # Mark as in progress
+                     tr.ocr_in_progress = True
                      
-                     if len(plate_results.boxes) > 0:
-                        # Get the best plate detection
-                        px1, py1, px2, py2 = plate_results.boxes.xyxy[0].cpu().numpy()
-                        plate_crop = veh_crop[int(py1):int(py2), int(px1):int(px2)]
-                        
-                        # Preprocessing for better OCR
-                        try:
-                            # 1. Grayscale
-                            gray_plate = cv2.cvtColor(plate_crop, cv2.COLOR_BGR2GRAY)
-                            # 2. Upscale (resize) to help with small text
-                            scale_factor = 3
-                            h, w = gray_plate.shape
-                            resized_plate = cv2.resize(gray_plate, (w * scale_factor, h * scale_factor), interpolation=cv2.INTER_CUBIC)
-                            # 3. Denoise
-                            denoised_plate = cv2.fastNlMeansDenoising(resized_plate, None, 10, 7, 21)
+                     # Launch background task
+                     asyncio.create_task(self._run_ocr_task(veh_crop, tr, video_path, detected_plates))
 
-                            # Read text using EasyOCR
-                            results = self.reader.readtext(denoised_plate, detail=1)
-                            
-                            # Filter and join results
-                            detected_texts = []
-                            for res in results:
-                                text = res[1]
-                                conf = res[2]
-                                # Only keep alphanumeric
-                                clean_text = "".join(e for e in text if e.isalnum()).upper()
-                                # Filter out very short noise (unless it's part of a sequence)
-                                if len(clean_text) >= 1 and conf > 0.2: 
-                                    detected_texts.append(clean_text)
-                            
-                            if detected_texts:
-                                plate_number = "".join(detected_texts)
-                                # Only save if we got a somewhat valid looking plate (e.g. length > 3)
-                                # This prevents saving "I" or "1" as a plate immediately
-                                if len(plate_number) > 3:
-                                    vehicle_entry = WrongSideVehicle(
-                                        plate_number=plate_number,
-                                        timestamp=datetime.now(),
-                                        video_file=os.path.basename(video_path)
-                                    )
-                                    try:
-                                        await collection.insert_one(vehicle_entry.dict())
-                                        print(f"Saved wrong-way vehicle {plate_number} (Track {tr.id}) to database.")
-                                        tr.plate_captured = True
-                                        detected_plates.append(plate_number)
-                                    except Exception as e:
-                                        print(f"DB Error: {e}")
-                                
-                        except Exception as e:
-                            print(f"OCR Error: {e}")
+            # Visualization
 
             # Visualization
             vis = frame.copy()
