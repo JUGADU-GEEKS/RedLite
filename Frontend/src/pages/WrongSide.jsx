@@ -16,59 +16,24 @@ const FloatingElement = ({ children, delay = 0, duration = 3 }) => (
 );
 
 const WrongSide = () => {
-    const [video, setVideo] = useState(null);
     const [detectedPlates, setDetectedPlates] = useState([]);
     const [currentFrame, setCurrentFrame] = useState(null);
     const [message, setMessage] = useState('');
     const [error, setError] = useState('');
-    const [loading, setLoading] = useState(false);
     const [processing, setProcessing] = useState(false);
     const navigate = useNavigate();
     const wsRef = useRef(null);
 
-    const handleFileChange = (e) => {
-        const file = e.target.files[0];
-        if (file && file.type === "video/mp4") {
-            setVideo(file);
-            setMessage('');
-            setError('');
-            setCurrentFrame(null);
-            setDetectedPlates([]);
-        } else {
-            setVideo(null);
-            setError('Please select a valid MP4 video file.');
-        }
-    };
-
-    const handleUploadAndStream = async () => {
-        if (!video) {
-            setError('Please select a video file first.');
-            return;
-        }
-
-        const formData = new FormData();
-        formData.append('video', video);
-
-        setLoading(true);
-        setMessage('Uploading video...');
+    const handleStartAnalysis = async () => {
+        setMessage('Starting real-time analysis...');
         setError('');
         setDetectedPlates([]);
         setCurrentFrame(null);
+        setProcessing(true);
 
         try {
-            // 1. Upload the video
-            const response = await axios.post('http://localhost:8000/wrong-side/upload', formData, {
-                headers: {
-                    'Content-Type': 'multipart/form-data',
-                },
-            });
-
-            const filename = response.data.filename;
-            setMessage('Video uploaded. Starting real-time analysis...');
-            setLoading(false);
-            setProcessing(true);
-
-            // 2. Connect to WebSocket for streaming
+            // Connect to WebSocket for streaming with static file
+            const filename = "wrongside.mp4";
             const wsUrl = `ws://localhost:8000/ws/wrong-side/${filename}`;
             wsRef.current = new WebSocket(wsUrl);
 
@@ -115,10 +80,10 @@ const WrongSide = () => {
             };
 
         } catch (err) {
-            console.error('Error uploading video:', err);
-            setError('Error uploading video. Please check the console for details and try again.');
+            console.error('Error starting analysis:', err);
+            setError('Error starting analysis. Please check the console for details and try again.');
             setMessage('');
-            setLoading(false);
+            setProcessing(false);
         }
     };
 
@@ -183,7 +148,7 @@ const WrongSide = () => {
                     </h1>
                     <div className="w-24 h-1 bg-gradient-to-r from-amber-500 to-orange-500 rounded-full mx-auto mb-8"></div>
                     <p className="text-lg md:text-xl max-w-2xl mx-auto text-gray-600 leading-relaxed font-light">
-                        Upload a video to detect vehicles traveling on the wrong side and identify their license plates in real-time.
+                        Detect vehicles traveling on the wrong side and identify their license plates in real-time.
                     </p>
                 </motion.div>
 
@@ -194,33 +159,26 @@ const WrongSide = () => {
                     className="w-full max-w-2xl bg-white/80 backdrop-blur-sm border-[3px] border-gray-300/50 rounded-2xl p-8 shadow-xl hover:shadow-2xl hover:bg-white/90 transition-all duration-500"
                 >
                     <div className="flex flex-col items-center justify-center w-full mb-6">
-                        <label htmlFor="file-upload" className="flex flex-col items-center justify-center w-full h-64 border-2 border-dashed border-amber-300/50 rounded-xl cursor-pointer hover:bg-amber-50/50 transition-colors duration-300 bg-white/50">
-                            <div className="flex flex-col items-center justify-center pt-5 pb-6">
-                                {video ? (
-                                    <>
-                                        <FileVideo className="w-12 h-12 mb-3 text-emerald-500" />
-                                        <p className="mb-2 text-sm text-gray-600"><span className="font-semibold text-gray-800">{video.name}</span> selected</p>
-                                    </>
-                                ) : (
-                                    <>
-                                        <UploadCloud className="w-12 h-12 mb-3 text-amber-400" />
-                                        <p className="mb-2 text-sm text-gray-600"><span className="font-semibold text-amber-600">Click to upload</span> or drag and drop</p>
-                                        <p className="text-xs text-gray-500">MP4 video file</p>
-                                    </>
-                                )}
-                            </div>
-                            <input id="file-upload" type="file" className="hidden" accept="video/mp4" onChange={handleFileChange} />
-                        </label>
+                        <div className="w-full rounded-xl overflow-hidden shadow-lg border-2 border-amber-200 bg-black">
+                            <video 
+                                src="/Videos/wrongside.mp4" 
+                                autoPlay
+                                loop
+                                muted
+                                playsInline
+                                className="w-full h-auto"
+                            />
+                        </div>
                     </div>
 
                     <motion.button
-                        onClick={handleUploadAndStream}
-                        disabled={loading || processing}
+                        onClick={handleStartAnalysis}
+                        disabled={processing}
                         className="w-full bg-gradient-to-r from-amber-500 to-orange-500 text-white font-bold py-3 px-4 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed hover:from-amber-600 hover:to-orange-600 flex items-center justify-center"
                         whileHover={{ scale: 1.02 }}
                         whileTap={{ scale: 0.98 }}
                     >
-                        {loading ? 'Uploading...' : processing ? (
+                        {processing ? (
                             <>
                                 <Activity className="w-5 h-5 mr-2 animate-pulse" />
                                 Processing Live Stream...

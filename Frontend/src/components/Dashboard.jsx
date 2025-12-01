@@ -8,6 +8,7 @@ import Navbar from './Navbar';
 import HowItWorks from './HowItWorks';
 import MapPage from './map';
 import Team from './team';
+import Chat from './chat';
 
 const laneDetails = {
   north: { label: 'North Lane', icon: ArrowUp, color: 'from-blue-500 to-cyan-500' },
@@ -630,6 +631,9 @@ function Dashboard({ onHowItWorksClick, onHomeClick, onDashboardClick, onMapClic
         )}
         
       </div>
+      
+      {/* Chat Component - pass detected user coordinates for location-based suggestions */}
+      <Chat userCoords={locationStatus.coordinates} />
     </div>
   );
 }
