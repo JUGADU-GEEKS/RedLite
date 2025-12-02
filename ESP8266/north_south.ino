@@ -2,107 +2,86 @@
 #include <ESP8266HTTPClient.h>
 #include <ArduinoJson.h>
 
-// WiFi credentials
-const char* ssid = "Tenda ";
-const char* password = "12345678";
+const char* ssid = "OPPO F25 Pro 5G";
+const char* password = "00000000";
+const char* serverName = "http://10.138.75.116:8000/signal_status/INT-001";
 
-// Your backend endpoint
-const char* serverName = "http://192.168.0.190:8000/signal_status";
+// NORTH LEDs
+const int northRed = D1;
+const int northYellow = D2;
+const int northGreen = D3;
 
-// North Signal Pins
-const int northRed = D1;     // GPIO5
-const int northYellow = D2;  // GPIO4
-const int northGreen = D3;   // GPIO0
+// SOUTH LEDs
+const int southRed = D5;
+const int southYellow = D6;
+const int southGreen = D7;
 
-// South Signal Pins
-const int southRed = D5;     // GPIO14
-const int southYellow = D6;  // GPIO12
-const int southGreen = D7;   // GPIO13
+// ================= Function Headers ===================
+void update(String s,int r,int y,int g);
+void turnAllOff();
 
+// ======================= SETUP =========================
 void setup() {
   Serial.begin(115200);
+
   WiFi.begin(ssid, password);
-
-  Serial.print("Connecting to WiFi");
-  while (WiFi.status() != WL_CONNECTED) {
-    delay(500);
+  Serial.print("Connecting WiFi...");
+  while(WiFi.status() != WL_CONNECTED){
     Serial.print(".");
+    delay(500);
   }
-  Serial.println("\nWiFi connected!");
+  Serial.println("\n✔ WiFi Connected!");
 
-  // Set LED pins as outputs
-  pinMode(northRed, OUTPUT);
-  pinMode(northYellow, OUTPUT);
-  pinMode(northGreen, OUTPUT);
-  pinMode(southRed, OUTPUT);
-  pinMode(southYellow, OUTPUT);
-  pinMode(southGreen, OUTPUT);
+  pinMode(northRed,OUTPUT); pinMode(northYellow,OUTPUT); pinMode(northGreen,OUTPUT);
+  pinMode(southRed,OUTPUT); pinMode(southYellow,OUTPUT); pinMode(southGreen,OUTPUT);
 
-  // Turn all lights off initially
-  turnAllLightsOff();
+  turnAllOff();
 }
 
+// ======================== LOOP =========================
 void loop() {
-  if (WiFi.status() == WL_CONNECTED) {
+  if(WiFi.status()==WL_CONNECTED){
     WiFiClient client;
     HTTPClient http;
 
-    http.begin(client, serverName);  // Connect to backend
-    int httpCode = http.GET();
+    http.begin(client, serverName);
+    int code = http.GET();
+    Serial.println("HTTP CODE = " + String(code));
 
-    if (httpCode == HTTP_CODE_OK) {
-      String payload = http.getString();
-      Serial.println("Response: " + payload);
+    if(code==200){
+      String data = http.getString();
+      Serial.println("📥 "+data);
 
-      StaticJsonDocument<256> doc;
-      DeserializationError error = deserializeJson(doc, payload);
+      StaticJsonDocument<512> doc;
+      if(!deserializeJson(doc,data)){
+        JsonObject lane = doc["state"];
 
-      if (!error) {
-        JsonObject signalData = doc[0];  // Get first object from array
-
-        String northSignal = signalData["north"];
-        String southSignal = signalData["south"];
-
-        Serial.println("North: " + northSignal + " | South: " + southSignal);
-
-        updateSignal(northSignal, northRed, northYellow, northGreen);
-        updateSignal(southSignal, southRed, southYellow, southGreen);
-      } else {
-        Serial.println("Failed to parse JSON!");
+        update(lane["north"], northRed, northYellow, northGreen);
+        update(lane["south"], southRed, southYellow, southGreen);
       }
-    } else {
-      Serial.println("GET request failed. HTTP Code: " + String(httpCode));
     }
-
     http.end();
-  } else {
-    Serial.println("WiFi not connected.");
   }
-
-  delay(3000);  // Fetch every 3 seconds
+  delay(2000);
 }
 
-void updateSignal(String signal, int redPin, int yellowPin, int greenPin) {
-  // Turn all lights off first
-  digitalWrite(redPin, LOW);
-  digitalWrite(yellowPin, LOW);
-  digitalWrite(greenPin, LOW);
+// ========================== FUNCTIONS ==========================
+void update(String s,int r,int y,int g){
+  digitalWrite(r,LOW);
+  digitalWrite(y,LOW);
+  digitalWrite(g,LOW);
 
-  // Turn ON only the correct light
-  if (signal == "red") {
-    digitalWrite(redPin, HIGH);
-  } else if (signal == "yellow") {
-    digitalWrite(yellowPin, HIGH);
-  } else if (signal == "green") {
-    digitalWrite(greenPin, HIGH);
-  }
+  if(s=="red") digitalWrite(r,HIGH);
+  if(s=="yellow") digitalWrite(y,HIGH);
+  if(s=="green") digitalWrite(g,HIGH);
 }
 
-void turnAllLightsOff() {
-  digitalWrite(northRed, LOW);
-  digitalWrite(northYellow, LOW);
-  digitalWrite(northGreen, LOW);
-  digitalWrite(southRed, LOW);
-  digitalWrite(southYellow, LOW);
-  digitalWrite(southGreen, LOW);
+void turnAllOff(){
+  digitalWrite(northRed,LOW);
+  digitalWrite(northYellow,LOW);
+  digitalWrite(northGreen,LOW);
+
+  digitalWrite(southRed,LOW);
+  digitalWrite(southYellow,LOW);
+  digitalWrite(southGreen,LOW);
 }

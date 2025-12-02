@@ -2,106 +2,86 @@
 #include <ESP8266HTTPClient.h>
 #include <ArduinoJson.h>
 
-// WiFi credentials
-const char* ssid = "Tenda ";
-const char* password = "12345678";
+const char* ssid = "OPPO F25 Pro 5G";
+const char* password = "00000000";
 
-// Your backend endpoint
-const char* serverName = "http://192.168.0.190:8000/signal_status";
+const char* serverName = "http://10.138.75.116:8000/signal_status/INT-001";  
 
-// East Signal Pins
-const int eastRed = D1;     // GPIO5
-const int eastYellow = D2;  // GPIO4
-const int eastGreen = D3;   // GPIO0
+// EAST LEDs
+const int eastRed = D1;
+const int eastYellow = D2;
+const int eastGreen = D3;
 
-// West Signal Pins
-const int westRed = D5;     // GPIO14
-const int westYellow = D6;  // GPIO12
-const int westGreen = D7;   // GPIO13
+// WEST LEDs
+const int westRed = D5;
+const int westYellow = D6;
+const int westGreen = D7;
 
-void setup() {
+void setup(){
   Serial.begin(115200);
-  WiFi.begin(ssid, password);
+  WiFi.begin(ssid,password);
 
-  Serial.print("Connecting to WiFi");
-  while (WiFi.status() != WL_CONNECTED) {
-    delay(500);
-    Serial.print(".");
-  }
-  Serial.println("\nWiFi connected!");
+  Serial.print("WiFi Connecting");
+  while(WiFi.status()!=WL_CONNECTED){ Serial.print("."); delay(500); }
+  Serial.println("\n✔ Connected to WiFi");
 
-  // Set LED pins as outputs
-  pinMode(eastRed, OUTPUT);
-  pinMode(eastYellow, OUTPUT);
-  pinMode(eastGreen, OUTPUT);
-  pinMode(westRed, OUTPUT);
-  pinMode(westYellow, OUTPUT);
-  pinMode(westGreen, OUTPUT);
+  pinMode(eastRed,OUTPUT);
+  pinMode(eastYellow,OUTPUT);
+  pinMode(eastGreen,OUTPUT);
 
-  // Turn all lights off initially
-  turnAllLightsOff();
+  pinMode(westRed,OUTPUT);
+  pinMode(westYellow,OUTPUT);
+  pinMode(westGreen,OUTPUT);
+
+  turnAllOff();
 }
 
-void loop() {
-  if (WiFi.status() == WL_CONNECTED) {
-    WiFiClient client;         // ✅ New API usage
+void loop(){
+
+  if(WiFi.status()==WL_CONNECTED){
+    WiFiClient client;
     HTTPClient http;
 
-    http.begin(client, serverName);  // ✅ Correct usage
+    http.begin(client, serverName);
+    int code = http.GET();
+    Serial.println("HTTP CODE = " + String(code));
 
-    int httpCode = http.GET();
-    if (httpCode == HTTP_CODE_OK) {
+    if(code == 200){
       String payload = http.getString();
-      Serial.println("Response: " + payload);
+      Serial.println("DATA RECEIVED -> " + payload);
 
-      StaticJsonDocument<256> doc;
-      DeserializationError error = deserializeJson(doc, payload);
+      StaticJsonDocument<512> doc;
+      DeserializationError err = deserializeJson(doc, payload);
 
-      if (!error) {
-        // ✅ Correct: your payload is an ARRAY
-        String eastSignal = doc[0]["east"];
-        String westSignal = doc[0]["west"];
+      if(!err){
+        JsonObject lane = doc["state"];
 
-        Serial.println("East: " + eastSignal + " | West: " + westSignal);
-
-        updateSignal(eastSignal, eastRed, eastYellow, eastGreen);
-        updateSignal(westSignal, westRed, westYellow, westGreen);
-      } else {
-        Serial.println("Failed to parse JSON!");
+        update(lane["east"], eastRed, eastYellow, eastGreen);
+        update(lane["west"], westRed, westYellow, westGreen);
       }
-    } else {
-      Serial.println("GET request failed, HTTP Code: " + String(httpCode));
     }
-
     http.end();
-  } else {
-    Serial.println("WiFi disconnected!");
   }
 
-  delay(3000); // Fetch every 3 seconds
+  delay(2000);
 }
 
-void updateSignal(String signal, int redPin, int yellowPin, int greenPin) {
-  // Turn all lights off first
-  digitalWrite(redPin, LOW);
-  digitalWrite(yellowPin, LOW);
-  digitalWrite(greenPin, LOW);
+void update(String s,int r,int y,int g){
+  digitalWrite(r,LOW);
+  digitalWrite(y,LOW);
+  digitalWrite(g,LOW);
 
-  // Turn ON only the correct light
-  if (signal == "red") {
-    digitalWrite(redPin, HIGH);
-  } else if (signal == "yellow") {
-    digitalWrite(yellowPin, HIGH);
-  } else if (signal == "green") {
-    digitalWrite(greenPin, HIGH);
-  }
+  if(s=="red")    digitalWrite(r,HIGH);
+  if(s=="yellow") digitalWrite(y,HIGH);
+  if(s=="green")  digitalWrite(g,HIGH);
 }
 
-void turnAllLightsOff() {
-  digitalWrite(eastRed, LOW);
-  digitalWrite(eastYellow, LOW);
-  digitalWrite(eastGreen, LOW);
-  digitalWrite(westRed, LOW);
-  digitalWrite(westYellow, LOW);
-  digitalWrite(westGreen, LOW);
+void turnAllOff(){
+  digitalWrite(eastRed,LOW);
+  digitalWrite(eastYellow,LOW);
+  digitalWrite(eastGreen,LOW);
+
+  digitalWrite(westRed,LOW);
+  digitalWrite(westYellow,LOW);
+  digitalWrite(westGreen,LOW);
 }

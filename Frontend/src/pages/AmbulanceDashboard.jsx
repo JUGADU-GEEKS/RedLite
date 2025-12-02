@@ -91,6 +91,29 @@ const AmbulanceDashboard = () => {
         }
     };
 
+    // Load last known position from localStorage on mount
+    useEffect(() => {
+        try {
+            const lastPos = localStorage.getItem('ambulance_last_position');
+            if (lastPos) {
+                const parsed = JSON.parse(lastPos);
+                if (parsed.lat && parsed.lon) {
+                    // Use last known position as initial center
+                    setCurrentPos({
+                        lat: parsed.lat,
+                        lon: parsed.lon,
+                        speed: parsed.speed || 0,
+                        headingDeg: parsed.headingDeg || null,
+                        accuracy: parsed.accuracy,
+                        ts: parsed.ts || Date.now()
+                    });
+                }
+            }
+        } catch (e) {
+            console.error('Failed to load last position from localStorage', e);
+        }
+    }, []);
+
     useEffect(() => {
         if (!navigator.geolocation) {
             setGeoError('Geolocation is not supported by this browser.');
@@ -115,6 +138,20 @@ const AmbulanceDashboard = () => {
                 currentPosRef.current = nextPos;
                 headingRef.current = derivedHeading;
                 setCurrentPos(nextPos);
+                
+                // Save to localStorage for next refresh
+                try {
+                    localStorage.setItem('ambulance_last_position', JSON.stringify({
+                        lat: snapshot.lat,
+                        lon: snapshot.lon,
+                        speed: snapshot.speed,
+                        headingDeg: derivedHeading,
+                        accuracy: snapshot.accuracy,
+                        ts: snapshot.ts
+                    }));
+                } catch (e) {
+                    console.error('Failed to save position to localStorage', e);
+                }
             },
             (err) => {
                 console.error(err);
@@ -378,6 +415,25 @@ const AmbulanceDashboard = () => {
           lon: Number(ix.lon ?? ix.lng ?? ix.longitude ?? ix.lon),
         }));
 
+    // Get initial center from currentPos or localStorage
+    const getInitialCenter = () => {
+        if (normalizedCurrentPos) {
+            return [normalizedCurrentPos.lat, normalizedCurrentPos.lon];
+        }
+        try {
+            const lastPos = localStorage.getItem('ambulance_last_position');
+            if (lastPos) {
+                const parsed = JSON.parse(lastPos);
+                if (parsed.lat && parsed.lon) {
+                    return [parsed.lat, parsed.lon];
+                }
+            }
+        } catch (e) {
+            // Ignore
+        }
+        return undefined;
+    };
+
     return (
         <div className="min-h-screen bg-gradient-to-br from-amber-50 via-orange-50 to-yellow-50 relative overflow-hidden">
             {/* decorative orbs */}
@@ -519,7 +575,7 @@ const AmbulanceDashboard = () => {
                                 intersections={normalizedIntersections}
                                 nearestAhead={nearestAhead}
                                 isActive={isActive}
-                                initialCenter={normalizedCurrentPos ? [normalizedCurrentPos.lat, normalizedCurrentPos.lon] : undefined}
+                                initialCenter={getInitialCenter()}
                             />
                         </div>
 
