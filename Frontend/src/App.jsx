@@ -19,6 +19,7 @@ import MyIntersections from './pages/MyIntersections';
 import LaneDashboard from './pages/LaneDashboard';
 import WrongSide from './pages/WrongSide';
 import AmbulanceDashboard from './pages/AmbulanceDashboard';
+import IllegalParkingDashboard from './pages/IllegalParking/IllegalParkingDashboard';
 
 function App() {
   const [darkMode, setDarkMode] = useState(true);
@@ -45,6 +46,7 @@ function App() {
             <Route path="/my-intersections" element={<ProtectedRoute roles={["employee"]}><MyIntersections/></ProtectedRoute>} />
             <Route path="/wrong-side" element={<ProtectedRoute roles={["admin", "employee"]}><WrongSide/></ProtectedRoute>} />
             <Route path="/ambulance-dashboard" element={<ProtectedRoute roles={["ambulance_driver"]}><AmbulanceDashboard/></ProtectedRoute>} />
+            <Route path="/illegal-parking" element={<ProtectedRoute roles={["employee", "admin"]}><IllegalParkingDashboard/></ProtectedRoute>} />
             <Route path="/unauthorized" element={<div style={{padding:'2rem'}}>Unauthorized</div>} />
           </Routes>
         </div>

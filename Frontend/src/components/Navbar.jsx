@@ -24,6 +24,7 @@ const Navbar = ({ darkMode, toggleDarkMode }) => {
             { label: 'Home', to: '/home', onClick: () => navigate('/home') },
             { label: 'Dashboard', to: '/dashboard', onClick: () => navigate('/dashboard') },
             { label: 'Manage Intersections', to: '/admin/intersections', onClick: () => navigate('/admin/intersections') },
+            { label: 'Illegal Parking', to: '/illegal-parking', onClick: () => navigate('/illegal-parking') },
         ];
     } else if (role === 'employee') {
         navItems = [
@@ -31,6 +32,7 @@ const Navbar = ({ darkMode, toggleDarkMode }) => {
             { label: 'Dashboard', to: '/dashboard', onClick: () => navigate('/dashboard') },
             { label: 'My Intersections', to: '/my-intersections', onClick: () => navigate('/my-intersections') },
             { label: 'Wrong Side', to: '/wrong-side', onClick: () => navigate('/wrong-side') },
+            { label: 'Illegal Parking', to: '/illegal-parking', onClick: () => navigate('/illegal-parking') },
         ];
     } else {
         navItems = [

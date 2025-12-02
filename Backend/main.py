@@ -1,6 +1,7 @@
 ## Importing Modules
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from fastapi import WebSocket
 from fastapi.responses import HTMLResponse
 import os
@@ -22,6 +23,9 @@ from fastapi import Response
 from math import radians, cos, sin, asin, sqrt
 logging.getLogger("ultralytics").setLevel(logging.WARNING)
 
+# Create logger instance
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
 
 # Initialising Apps
 app = FastAPI()
@@ -49,6 +53,17 @@ app.add_middleware(
 @app.api_route("/health", methods=["GET", "HEAD"])
 def health():
     return {"status": "ok"}
+
+# Mount static files directory for vehicle images
+static_dir = os.path.join(os.path.dirname(__file__), "static")
+os.makedirs(static_dir, exist_ok=True)
+os.makedirs(os.path.join(static_dir, "vehicle_images"), exist_ok=True)
+try:
+    app.mount("/static", StaticFiles(directory=static_dir), name="static")
+    logger.info(f"[STATIC] Mounted static files from {static_dir}")
+except Exception as e:
+    logger.warning(f"[STATIC] Failed to mount static files: {e}")
+
 # Variables
 
 def send_alert_email(location, alert_type='emergency'):
@@ -156,6 +171,15 @@ try:
     from routers.emergency_router import router as emergency_router
     from routers.potholes_router import router as potholes_router
     from routers.chat_router import router as chatbot_router
+    from routes.zoneRoutes import router as zone_router
+    from routes.boundaryLineRoutes import router as boundary_line_router
+    from routes.illegalParkingRoutes import router as illegal_parking_router
+    try:
+        from routes.illegalParkingDetectionRoutes import router as illegal_parking_detection_router
+        logger.info("[ROUTERS] Successfully imported illegalParkingDetectionRoutes")
+    except Exception as e:
+        logger.error(f"[ROUTERS] Failed to import illegalParkingDetectionRoutes: {e}", exc_info=True)
+        illegal_parking_detection_router = None
     app.include_router(auth_router)
     app.include_router(admin_router)
     app.include_router(protected_router)
@@ -166,11 +190,22 @@ try:
     app.include_router(emergency_router)
     app.include_router(potholes_router)
     app.include_router(chatbot_router)
+    app.include_router(zone_router)
+    app.include_router(boundary_line_router)
+    app.include_router(illegal_parking_router)
+    if illegal_parking_detection_router:
+        app.include_router(illegal_parking_detection_router)
+        logger.info("[ROUTERS] Successfully included illegalParkingDetectionRoutes")
+    else:
+        logger.warning("[ROUTERS] illegalParkingDetectionRoutes not included due to import error")
     logging.info("[ROUTERS] Successfully included all routers")
     # Verify auth routes are registered
     routes = [r.path for r in app.routes]
     auth_routes = [r for r in routes if '/auth' in r]
     logging.info(f"[ROUTERS] Registered auth routes: {auth_routes}")
+    # Verify illegal parking routes are registered
+    illegal_parking_routes = [r for r in routes if '/illegal-parking' in r]
+    logging.info(f"[ROUTERS] Registered illegal parking routes: {illegal_parking_routes}")
 except Exception as e:
     logging.error(f"[ROUTERS] Failed to include routers: {e}", exc_info=True)
     import traceback
@@ -178,12 +213,19 @@ except Exception as e:
 
 from services.lane_service import get_lane_service
 from services import emergency_service
+from services.illegalParkingDetectionService import get_detection_service
 import asyncio
 
 @app.on_event("startup")
 async def startup_event():
     lane_service = get_lane_service()
     asyncio.create_task(lane_service.background_loop())
+    
+    # Initialize illegal parking detection service
+    # Note: Detection will start when cameras are configured
+    # Use POST /api/illegal-parking/start-detection to start monitoring
+    detection_service = get_detection_service()
+    logger.info("[STARTUP] Illegal parking detection service initialized (use API to start)")
 
 @app.on_event("shutdown")
 def shutdown_event():
