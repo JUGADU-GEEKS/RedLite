@@ -144,37 +144,31 @@ LANE_TO_LOCATION = {
 from fastapi import Body
 from fastapi.responses import JSONResponse
 
-# Include auth/admin routers
-try:
-    from routers.auth_router import router as auth_router
-    from routers.admin_router import router as admin_router
-    from routers.protected_examples import router as protected_router
-    from routers.intersection_router import router as intersection_router
-    from routers.lane_router import router as lane_router
-    from routers.ws_router import router as ws_router
-    from routers.wrong_side_router import router as wrong_side_router
-    from routers.emergency_router import router as emergency_router
-    from routers.potholes_router import router as potholes_router
-    from routers.chat_router import router as chatbot_router
-    app.include_router(auth_router)
-    app.include_router(admin_router)
-    app.include_router(protected_router)
-    app.include_router(intersection_router)
-    app.include_router(lane_router)
-    app.include_router(ws_router)
-    app.include_router(wrong_side_router)
-    app.include_router(emergency_router)
-    app.include_router(potholes_router)
-    app.include_router(chatbot_router)
-    logging.info("[ROUTERS] Successfully included all routers")
-    # Verify auth routes are registered
-    routes = [r.path for r in app.routes]
-    auth_routes = [r for r in routes if '/auth' in r]
-    logging.info(f"[ROUTERS] Registered auth routes: {auth_routes}")
-except Exception as e:
-    logging.error(f"[ROUTERS] Failed to include routers: {e}", exc_info=True)
-    import traceback
-    traceback.print_exc()
+# Include auth/admin routers safely: import each router separately so one
+# missing optional dependency doesn't block the entire application.
+def _include_router_safe(module_name, attr_name='router'):
+    try:
+        mod = __import__(f'routers.{module_name}', fromlist=[attr_name])
+        r = getattr(mod, attr_name)
+        app.include_router(r)
+        logging.info(f"[ROUTERS] Included {module_name}")
+        return True
+    except Exception as e:
+        logging.error(f"[ROUTERS] Failed to include {module_name}: {e}", exc_info=True)
+        return False
+
+# Attempt to include routers one-by-one
+routers_to_try = [
+    'auth_router', 'admin_router', 'protected_examples', 'intersection_router',
+    'lane_router', 'ws_router', 'wrong_side_router', 'emergency_router',
+    'sos_router', 'potholes_router', 'chat_router'
+]
+included = []
+for rn in routers_to_try:
+    if _include_router_safe(rn):
+        included.append(rn)
+
+logging.info(f"[ROUTERS] Inclusion attempt finished; included routers: {included}")
 
 from services.lane_service import get_lane_service
 from services import emergency_service
@@ -189,6 +183,21 @@ async def startup_event():
 def shutdown_event():
     lane_service = get_lane_service()
     lane_service.release()
+
+
+# Debug endpoints to help troubleshooting route registration / basic health
+@app.get('/debug/ping')
+def debug_ping():
+    return {'ok': True, 'time': time.strftime('%Y-%m-%d %H:%M:%S')}
+
+
+@app.get('/debug/routes')
+def debug_routes():
+    try:
+        routes = sorted(list({r.path for r in app.routes}))
+        return {'routes': routes, 'count': len(routes)}
+    except Exception as e:
+        return JSONResponse({'status': 'error', 'message': f'Failed to enumerate routes: {e}'}, status_code=500)
 
 
 @app.post('/send_breakdown_alert')

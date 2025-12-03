@@ -4,6 +4,7 @@ import { AlertTriangle, Phone, Shield, ArrowLeft } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import Navbar from './Navbar';
 import emer from '../assets/emer.mp4';
+import { getUser } from '../services/auth';
 
 // Floating elements for background decoration
 const FloatingElement = ({ children, delay = 0, duration = 3 }) => (
@@ -45,84 +46,107 @@ const SOS = () => {
 
   const handleSOSActivation = async () => {
     if (isActivated) return;
-    
+
     setIsLoading(true);
-    setMessage('');
-    
+    setMessage('SOS alert triggered — notifying help...');
+
     try {
-      // Send emergency email to police station
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/send_emergency_alert`, {
+      // Resolve location: try live geolocation first, else fallback to captured coords
+      const getPosition = () => new Promise((resolve, reject) => {
+        if (!navigator || !navigator.geolocation) return reject(new Error('Geolocation not available'));
+        navigator.geolocation.getCurrentPosition(
+          (pos) => resolve(pos.coords),
+          (err) => reject(err),
+          { enableHighAccuracy: true, timeout: 7000 }
+        );
+      });
+
+      let latitude = coords.lat;
+      let longitude = coords.lon;
+      try {
+        const p = await getPosition();
+        latitude = p.latitude;
+        longitude = p.longitude;
+        setCoords({ lat: latitude, lon: longitude });
+      } catch (err) {
+        // keep existing coords or undefined; backend will accept numbers
+        if (latitude == null || longitude == null) {
+          // attempt backend fallback
+          try {
+            const r = await fetch(`${import.meta.env.VITE_API_URL}/get_traffic_coords`);
+            if (r.ok) {
+              const jd = await r.json();
+              const c = jd.coordinates;
+              if (c && c.lat != null) {
+                latitude = c.lat;
+                longitude = c.lon;
+                setCoords({ lat: latitude, lon: longitude });
+              }
+            }
+          } catch (e) {
+            console.warn('No fallback coords available for SOS:', e);
+          }
+        }
+      }
+
+      const user = getUser();
+      const payload = {
+        userId: user?.userId || user?.id || 'anonymous',
+        userName: user?.name || user?.fullName || user?.username || 'Anonymous',
+        phone: user?.phone || user?.mobile || '',
+        vehicle: user?.vehicleId || user?.ambulanceInfo?.vehicleId || user?.vehicle || 'not provided',
+        latitude: latitude || 0,
+        longitude: longitude || 0
+      };
+
+      // POST to new SOS endpoint
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/sos/send`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          type: 'emergency_sos',
-          message: 'EMERGENCY SOS ALERT - Immediate police assistance required',
-          location: 'Current traffic intersection'
-        })
+        body: JSON.stringify(payload)
       });
-      
-      // In parallel (non-blocking), send a call alert to the backend using available coordinates.
-      (async () => {
-        try {
-          let sendCoords = null;
-          if (coords && coords.lat != null) {
-            sendCoords = [coords.lat, coords.lon];
-          } else {
-            // fallback to backend configured traffic coords
-            try {
-              const r = await fetch(`${import.meta.env.VITE_API_URL}/get_traffic_coords`);
-              if (r.ok) {
-                const jd = await r.json();
-                const c = jd.coordinates;
-                if (c && c.lat != null) sendCoords = [c.lat, c.lon];
-              }
-            } catch (e) {
-              console.warn('Failed to fetch fallback coords for call alert:', e);
-            }
-          }
 
-          if (sendCoords) {
-            await fetch(`${import.meta.env.VITE_API_URL}/send_call_alert`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ coords: sendCoords }),
-            });
-          } else {
-            console.warn('No coordinates available to send call alert');
-          }
-        } catch (err) {
-          console.error('Error sending call alert:', err);
-        }
-      })();
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+      if (!res.ok) {
+        const txt = await res.text().catch(() => '');
+        throw new Error(`Server error: ${res.status} ${txt}`);
       }
 
-      const result = await response.json();
-      
-      if (result.status === 'success') {
-        setMessage('🚨 Emergency alert sent successfully! Emergency services have been notified.');
+      const body = await res.json();
+      if (body && body.status === 'success') {
+        const caseId = body.caseId;
+        const notifiedCount = (body.notified && body.notified.length) || (body.sms && body.sms.length) || 0;
         setIsActivated(true);
-        
-        // Play siren sound
+        setMessage(`SOS sent — Case ID: ${caseId}. Notified ${notifiedCount} contacts.`);
         playSirenSound();
-        
-        // Reset after 15 seconds
+
+        // Show detailed SMS results in console and a compact UI debug block
+        console.log('[SOS] server response:', body);
+        if (body.sms) {
+          // Attach a readable debug message to inform whether sends were accepted
+          const smsDebug = body.sms.map(s => `${s.phone}: ${s.status}${s.sid ? ` (sid: ${s.sid})` : s.error ? ` (error)` : ''}`);
+          setMessage(prev => prev + '\n' + smsDebug.join('\n'));
+        }
+
+        // Persist caseId to localStorage so the citizen dashboard can detect acknowledgement
+        try {
+          const stored = JSON.parse(localStorage.getItem('lanezy_sos_cases') || '[]');
+          const user = getUser();
+          stored.push({ caseId, userId: user?.userId || user?.id || 'anonymous' });
+          localStorage.setItem('lanezy_sos_cases', JSON.stringify(stored));
+        } catch (e) {
+          console.warn('Failed to persist caseId locally', e);
+        }
+
+        // Auto-reset visual state after 15s (but do not show acknowledgement here)
         setTimeout(() => {
           setIsActivated(false);
-          setMessage('');
         }, 15000);
       } else {
-        setMessage(`❌ Failed to send emergency alert: ${result.message || 'Unknown error'}. Please call emergency services directly at 100.`);
+        setMessage(`❌ Failed to trigger SOS: ${body?.message || 'Unknown error'}`);
       }
-    } catch (error) {
-      console.error('Emergency alert error:', error);
-      if (error.name === 'TypeError' && error.message.includes('fetch')) {
-        setMessage('❌ Cannot connect to server. Please call emergency services directly at 100.');
-      } else {
-        setMessage(`❌ Network error: ${error.message}. Please call emergency services directly at 100.`);
-      }
+    } catch (err) {
+      console.error('SOS activation error:', err);
+      setMessage('❌ Failed to trigger SOS. Please call emergency services directly.');
     } finally {
       setIsLoading(false);
     }

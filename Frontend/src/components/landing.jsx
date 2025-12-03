@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import Navbar from './Navbar';
 import Dashboard from './Dashboard';
@@ -14,7 +14,7 @@ const TrafficLight = ({ delay = 0 }) => {
   const [activeLight, setActiveLight] = useState(1);
 
   React.useEffect(() => {
-    const interval = setInterval(() => {1
+    const interval = setInterval(() => {
       setActiveLight((prev) => (prev + 1) % 3);
     }, 2000);
     return () => clearInterval(interval);
@@ -84,8 +84,52 @@ const Landing = () => {
   const [showDashboard, setShowDashboard] = useState(false);
   const [showMap, setShowMap] = useState(false);
   const [showTeam, setShowTeam] = useState(false);
+  const [ackPopup, setAckPopup] = useState({ visible: false, message: '' });
+  const [pollingActive, setPollingActive] = useState(false);
 
   const navigate = useNavigate();
+
+  // Poll for acknowledgements for cases created by this user (stored in localStorage by SOS.jsx)
+  useEffect(() => {
+    let interval = null;
+    const startPolling = () => {
+      if (pollingActive) return;
+      setPollingActive(true);
+      interval = setInterval(async () => {
+        try {
+          const user = JSON.parse(localStorage.getItem('lanezy_user') || 'null');
+          if (!user) return;
+          const userId = user.userId || user.id;
+          const stored = JSON.parse(localStorage.getItem('lanezy_sos_cases') || '[]');
+          if (!Array.isArray(stored) || stored.length === 0) return;
+          for (let i = 0; i < stored.length; i++) {
+            const c = stored[i];
+            if (c.userId !== userId) continue;
+            try {
+              const r = await fetch(`${import.meta.env.VITE_API_URL}/sos/status?caseId=${c.caseId}`);
+              if (!r.ok) continue;
+              const jd = await r.json();
+              if (jd.status === 'success' && jd.recordStatus === 'Acknowledged') {
+                // Show popup to this citizen
+                setAckPopup({ visible: true, message: '✔ Your SOS request has been acknowledged by authorities. Help is on the way.' });
+                // Remove this case from stored list
+                const remaining = stored.filter(x => x.caseId !== c.caseId);
+                localStorage.setItem('lanezy_sos_cases', JSON.stringify(remaining));
+                break; // show one popup at a time
+              }
+            } catch (e) {
+              console.warn('Ack polling error', e);
+            }
+          }
+        } catch (e) {
+          console.warn('Ack polling outer error', e);
+        }
+      }, 5000);
+    };
+
+    startPolling();
+    return () => { if (interval) clearInterval(interval); setPollingActive(false); };
+  }, []);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-amber-50 via-orange-50 to-yellow-50 relative overflow-hidden">
@@ -308,6 +352,21 @@ const Landing = () => {
             </motion.p>
           </motion.div>
         </>
+      )}
+
+      {/* Acknowledgement popup for citizens (rendered inside root) */}
+      {ackPopup.visible && (
+        <div className="fixed bottom-8 right-8 z-50">
+          <div className="bg-white/95 p-4 rounded-xl shadow-2xl border border-green-200">
+            <div className="flex items-center space-x-3">
+              <div className="text-green-600 font-bold">✔</div>
+              <div className="text-sm text-gray-900">{ackPopup.message}</div>
+            </div>
+            <div className="mt-2 text-right">
+              <button className="px-3 py-1 text-sm text-gray-600" onClick={() => setAckPopup({ visible: false, message: '' })}>Dismiss</button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
