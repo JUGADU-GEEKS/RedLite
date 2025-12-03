@@ -159,7 +159,6 @@ LANE_TO_LOCATION = {
 from fastapi import Body
 from fastapi.responses import JSONResponse
 
-<<<<<<< HEAD
 # Include auth/admin routers safely: import each router separately so one
 # missing optional dependency doesn't block the entire application.
 def _include_router_safe(module_name, attr_name='router'):
@@ -185,7 +184,6 @@ for rn in routers_to_try:
         included.append(rn)
 
 logging.info(f"[ROUTERS] Inclusion attempt finished; included routers: {included}")
-=======
 # Include auth/admin routers
 try:
     from routers.auth_router import router as auth_router
@@ -237,7 +235,6 @@ except Exception as e:
     logging.error(f"[ROUTERS] Failed to include routers: {e}", exc_info=True)
     import traceback
     traceback.print_exc()
->>>>>>> 4b4eab3d9c624861c44d9e45d1600fbb75a22d2b
 
 from services.lane_service import get_lane_service
 from services import emergency_service

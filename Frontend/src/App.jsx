@@ -19,11 +19,8 @@ import MyIntersections from './pages/MyIntersections';
 import LaneDashboard from './pages/LaneDashboard';
 import WrongSide from './pages/WrongSide';
 import AmbulanceDashboard from './pages/AmbulanceDashboard';
-<<<<<<< HEAD
 import AuthorityDashboard from './pages/AuthorityDashboard';
-=======
 import IllegalParkingDashboard from './pages/IllegalParking/IllegalParkingDashboard';
->>>>>>> 4b4eab3d9c624861c44d9e45d1600fbb75a22d2b
 
 function App() {
   const [darkMode, setDarkMode] = useState(true);
@@ -50,11 +47,8 @@ function App() {
             <Route path="/my-intersections" element={<ProtectedRoute roles={["employee"]}><MyIntersections/></ProtectedRoute>} />
             <Route path="/wrong-side" element={<ProtectedRoute roles={["admin", "employee"]}><WrongSide/></ProtectedRoute>} />
             <Route path="/ambulance-dashboard" element={<ProtectedRoute roles={["ambulance_driver"]}><AmbulanceDashboard/></ProtectedRoute>} />
-<<<<<<< HEAD
             <Route path="/authority/dashboard" element={<AuthorityDashboard/>} />
-=======
             <Route path="/illegal-parking" element={<ProtectedRoute roles={["employee", "admin"]}><IllegalParkingDashboard/></ProtectedRoute>} />
->>>>>>> 4b4eab3d9c624861c44d9e45d1600fbb75a22d2b
             <Route path="/unauthorized" element={<div style={{padding:'2rem'}}>Unauthorized</div>} />
           </Routes>
         </div>
