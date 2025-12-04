@@ -60,8 +60,12 @@ export default function SignupPage() {
       }
 
       await signup(payload);
-      // After signup, navigate to login
-      navigate('/login');
+      // After signup, redirect based on role
+      if (form.role === 'admin') {
+        navigate('/admin/intersections');
+      } else {
+        navigate('/login');
+      }
     } catch (err) {
       setError('Signup failed. Please try again.');
     } finally {
@@ -228,6 +232,7 @@ export default function SignupPage() {
                   >
                     <option value="user">Civilian</option>
                     <option value="employee">Traffic Officer</option>
+                    <option value="admin">Admin</option>
                     <option value="ambulance_driver">Ambulance Driver</option>
                   </select>
                   <div className="absolute right-4 top-1/2 transform -translate-y-1/2 pointer-events-none">

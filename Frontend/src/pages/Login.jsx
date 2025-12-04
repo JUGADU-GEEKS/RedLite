@@ -35,11 +35,11 @@ export default function LoginPage() {
     setLoading(true);
     try {
       const user = await login(email, password);
-      if (user.role === 'admin') navigate('/admin');
+      if (user.role === 'admin') navigate('/admin/intersections');
       else if (user.role === 'ambulance_driver') navigate('/ambulance-dashboard');
       else if (user.role === 'employee') {
         const ints = user.assignedIntersections || [];
-        if (ints.length > 0) navigate(`/dashboard`);
+        if (ints.length > 0) navigate(`/my-intersections`);
         else navigate('/dashboard');
       } else {
         navigate('/home');
