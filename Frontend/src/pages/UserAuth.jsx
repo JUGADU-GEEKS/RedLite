@@ -50,13 +50,8 @@ export default function UserAuth() {
     if (!validateSignup()) return
     setLoading(true)
     try {
-      // Backend expects `name`, `email`, `password` (and optional `role`/`ambulanceInfo`).
+      // Always register as a normal user from this route
       const payload = { name: fullName, email, password, mobile, role: 'user' }
-      // Include ambulanceInfo only if vehicle/chassis provided and user intends to register as ambulance_driver
-      if (vehicle && chassisLast4) {
-        payload.role = 'ambulance_driver'
-        payload.ambulanceInfo = { vehicleId: vehicle, driverLicense: chassisLast4 }
-      }
 
       await authSignup(payload)
       setSignupError('')

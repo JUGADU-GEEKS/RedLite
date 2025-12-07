@@ -28,8 +28,8 @@ const Navbar = ({ darkMode, toggleDarkMode }) => {
         // Civilian: Home, SOS, Report Issue, Logout
         navItems = [
             { label: 'Home', to: '/home', onClick: () => navigate('/home') },
-            { label: 'SOS', to: '/sos', onClick: () => navigate('/sos') },
             { label: 'Report Issue', to: '/issue', onClick: () => navigate('/issue') },
+            { label: 'Profile', to: '/user-profile', onClick: () => navigate('/user-profile') },
         ];
     } else if (role === 'employee') {
         // Traffic Officer: My Intersections, Wrong Side, Illegal Parking, Logout
@@ -49,7 +49,7 @@ const Navbar = ({ darkMode, toggleDarkMode }) => {
             { label: 'SOS', to: '/sos', onClick: () => navigate('/sos') },
             { label: 'Map', to: '/map', onClick: () => navigate('/map') },
             { label: 'Potholes Map', to: '/potholes-map', onClick: () => navigate('/potholes-map') },
-            { label: 'Issue', to: '/issue', onClick: () => navigate('/issue') },
+            { label: 'Approvals', to: '/authority/dashboard', onClick: () => navigate('/authority/dashboard') },
             // Intentionally omit Dashboard route
         ];
     } else {
@@ -60,7 +60,7 @@ const Navbar = ({ darkMode, toggleDarkMode }) => {
     }
 
     if (localStorage.getItem('lanezy_token')) {
-        navItems.push({ label: 'Profile', to: '/user-profile', onClick: () => navigate('/user-profile') });
+        // navItems.push({ label: 'Profile', to: '/user-profile', onClick: () => navigate('/user-profile') });
         navItems.push({ label: 'Logout', to: '/', onClick: handleLogout });
     }
 
@@ -107,9 +107,8 @@ const Navbar = ({ darkMode, toggleDarkMode }) => {
                                                 e.preventDefault();
                                                 item.onClick();
                                             }}
-                                            className={`px-4 py-2 rounded-lg transition-all duration-300 font-medium ${
-                                                isActive ? (darkMode ? 'bg-gradient-to-r from-orange-500 to-yellow-400 text-white shadow-md' : 'bg-gradient-to-r from-orange-400 to-yellow-300 text-white shadow-md') : (darkMode ? 'text-gray-300 hover:text-white hover:bg-orange-500/8' : 'text-gray-700 hover:text-gray-900 hover:bg-orange-50/60')
-                                            }`}
+                                            className={`px-4 py-2 rounded-lg transition-all duration-300 font-medium ${isActive ? (darkMode ? 'bg-gradient-to-r from-orange-500 to-yellow-400 text-white shadow-md' : 'bg-gradient-to-r from-orange-400 to-yellow-300 text-white shadow-md') : (darkMode ? 'text-gray-300 hover:text-white hover:bg-orange-500/8' : 'text-gray-700 hover:text-gray-900 hover:bg-orange-50/60')
+                                                }`}
                                             whileHover={{ scale: 1.03 }}
                                             whileTap={{ scale: 0.95 }}
                                         >
@@ -118,65 +117,65 @@ const Navbar = ({ darkMode, toggleDarkMode }) => {
                                     );
                                 })}
 
-                            {/** GitHub link removed per request */}
+                                {/* GitHub link removed per request */}
 
-                            {localStorage.getItem('lanezy_token') ? (
-                                <motion.button
-                                    onClick={() => navigate('/user-profile')}
-                                    className={darkMode ? 'p-2 rounded-lg bg-orange-800/12 text-gray-300 hover:text-white' : 'p-2 rounded-lg bg-orange-100/60 text-gray-600 hover:text-gray-900'}
-                                    initial={{ opacity: 0, x: 20 }}
-                                    animate={{ opacity: 1, x: 0 }}
-                                    transition={{ duration: 0.6, delay: 0.5 }}
-                                    whileTap={{ scale: 0.95 }}
-                                    aria-label="Profile"
-                                >
-                                    <User size={18} />
-                                </motion.button>
-                            ) : null}
-                        </div>
+                                {localStorage.getItem('lanezy_token') ? (
+                                    <motion.button
+                                        onClick={() => navigate('/user-profile')}
+                                        className={darkMode ? 'p-2 rounded-lg bg-orange-800/12 text-gray-300 hover:text-white' : 'p-2 rounded-lg bg-orange-100/60 text-gray-600 hover:text-gray-900'}
+                                        initial={{ opacity: 0, x: 20 }}
+                                        animate={{ opacity: 1, x: 0 }}
+                                        transition={{ duration: 0.6, delay: 0.5 }}
+                                        whileTap={{ scale: 0.95 }}
+                                        aria-label="Profile"
+                                    >
+                                        <User size={18} />
+                                    </motion.button>
+                                ) : null}
+                            </div>
 
                             <motion.button
-                            className="md:hidden p-1.5 rounded-lg bg-gradient-to-r from-orange-400 to-yellow-300 text-white"
-                            onClick={() => setIsMenuOpen(!isMenuOpen)}
-                            initial={false}
-                            animate={{ rotate: isMenuOpen ? 90 : 0 }}
-                            transition={{ duration: 0.2 }}
-                        >
-                            {isMenuOpen ? <X size={20} /> : <Menu size={20} />}
-                        </motion.button>
-                    </div>
+                                className="md:hidden p-1.5 rounded-lg bg-gradient-to-r from-orange-400 to-yellow-300 text-white"
+                                onClick={() => setIsMenuOpen(!isMenuOpen)}
+                                initial={false}
+                                animate={{ rotate: isMenuOpen ? 90 : 0 }}
+                                transition={{ duration: 0.2 }}
+                            >
+                                {isMenuOpen ? <X size={20} /> : <Menu size={20} />}
+                            </motion.button>
+                        </div>
 
-                    {/* Mobile Menu (collapsible) */}
-                    <motion.div
-                        className="md:hidden"
-                        initial={{ height: 0, opacity: 0 }}
-                        animate={{ height: isMenuOpen ? 'auto' : 0, opacity: isMenuOpen ? 1 : 0 }}
-                        transition={{ duration: 0.25 }}
-                    >
-                          {isMenuOpen && (
-                          <div className={`${darkMode ? 'bg-orange-900/18' : 'bg-orange-50/30'} mt-2 py-3 space-y-1 rounded-b-2xl`}>
-                                {navItems.map((item, index) => (
-                                    <motion.a
-                                        key={item.label}
-                                        href="#"
-                                        onClick={(e) => {
-                                            e.preventDefault();
-                                            item.onClick();
-                                            setIsMenuOpen(false);
-                                        }}
-                                        className={`block px-4 py-2 rounded-lg text-center ${
-                                            item.to && location.pathname === item.to ? (darkMode ? 'bg-orange-600 text-white' : 'bg-orange-400 text-white') : (darkMode ? 'text-gray-300 hover:text-white hover:bg-orange-500/8' : 'text-gray-600 hover:text-gray-900 hover:bg-orange-50/60')
-                                        } transition-colors duration-300`}
-                                        initial={{ opacity: 0, x: -20 }}
-                                        animate={{ opacity: 1, x: 0 }}
-                                        transition={{ delay: index * 0.05 }}
-                                    >
-                                        {item.label}
-                                    </motion.a>
-                                ))}
-                            </div>
-                        )}
-                    </motion.div>
+                        {/* Mobile Menu (collapsible) */}
+                        <motion.div
+                            className="md:hidden"
+                            initial={{ height: 0, opacity: 0 }}
+                            animate={{ height: isMenuOpen ? 'auto' : 0, opacity: isMenuOpen ? 1 : 0 }}
+                            transition={{ duration: 0.25 }}
+                        >
+                            {isMenuOpen && (
+                                <div className={`${darkMode ? 'bg-orange-900/18' : 'bg-orange-50/30'} mt-2 py-3 space-y-1 rounded-b-2xl`}>
+                                    {navItems.map((item, index) => (
+                                        <motion.a
+                                            key={item.label}
+                                            href="#"
+                                            onClick={(e) => {
+                                                e.preventDefault();
+                                                item.onClick();
+                                                setIsMenuOpen(false);
+                                            }}
+                                            className={`block px-4 py-2 rounded-lg text-center ${item.to && location.pathname === item.to ? (darkMode ? 'bg-orange-600 text-white' : 'bg-orange-400 text-white') : (darkMode ? 'text-gray-300 hover:text-white hover:bg-orange-500/8' : 'text-gray-600 hover:text-gray-900 hover:bg-orange-50/60')
+                                                } transition-colors duration-300`}
+                                            initial={{ opacity: 0, x: -20 }}
+                                            animate={{ opacity: 1, x: 0 }}
+                                            transition={{ delay: index * 0.05 }}
+                                        >
+                                            {item.label}
+                                        </motion.a>
+                                    ))}
+                                </div>
+                            )}
+                        </motion.div>
+                    </div>
                 </div>
             </div>
         </nav>

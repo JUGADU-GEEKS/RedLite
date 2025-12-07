@@ -230,7 +230,6 @@ export default function SignupPage() {
                     onChange={handleChange}
                     className="w-full pl-12 pr-4 py-4 bg-white/60 backdrop-blur-sm border border-gray-200/50 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent transition-all duration-300 appearance-none"
                   >
-                    <option value="user">Civilian</option>
                     <option value="employee">Traffic Officer</option>
                     <option value="admin">Admin</option>
                     <option value="ambulance_driver">Ambulance Driver</option>

@@ -76,16 +76,6 @@ export default function UserProfile(){
                   <div className="text-sm text-gray-700 space-y-2">
                     <div><span className="font-medium">Phone:</span> {profile.mobile || 'Not provided'}</div>
                     <div><span className="font-medium">Email:</span> {profile.email}</div>
-                    <div><span className="font-medium">Location:</span> {profile.location || '—'}</div>
-                    <div><span className="font-medium">Website:</span> {profile.site || '—'}</div>
-                  </div>
-                </div>
-
-                <div className="p-4 bg-white rounded-lg border">
-                  <h4 className="font-semibold mb-3">Basic Information</h4>
-                  <div className="text-sm text-gray-700 space-y-2">
-                    <div><span className="font-medium">Joined:</span> {profile.createdAt || '—'}</div>
-                    <div><span className="font-medium">Verified:</span> {profile.verified ? 'Yes' : 'No'}</div>
                   </div>
                 </div>
               </div>

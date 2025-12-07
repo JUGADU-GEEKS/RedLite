@@ -64,7 +64,7 @@ const MyIntersections = () => {
                     </h1>
                     <div className="w-24 h-1 bg-gradient-to-r from-amber-500 to-orange-500 rounded-full mb-4"></div>
                     <p className="text-lg text-gray-700">
-                        📊 View and manage your assigned traffic intersections
+                        View and manage your assigned traffic intersections
                     </p>
                 </motion.div>
 
