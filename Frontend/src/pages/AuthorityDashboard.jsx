@@ -23,17 +23,25 @@ function AuthorityDashboardInner() {
 
   useEffect(() => { fetchList(); }, []);
 
-  const acknowledge = async (caseId) => {
+  const acknowledge = async (caseId, action = 'ack') => {
     try {
-      await fetch(`${import.meta.env.VITE_API_URL}/sos/acknowledge`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ caseId })
+      const token = localStorage.getItem('lanezy_token')
+      const headers = { 'Content-Type': 'application/json' }
+      if (token) headers['Authorization'] = `Bearer ${token}`
+
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/sos/acknowledge`, {
+        method: 'POST', headers, body: JSON.stringify({ caseId, action })
       });
+      const jd = await res.json().catch(() => ({}))
       // refresh
       fetchList();
-      alert('Case acknowledged.');
+      if (jd && jd.status === 'success') {
+        alert(action === 'report' ? 'Case reported.' : 'Case acknowledged.')
+      } else {
+        alert('Action completed.');
+      }
     } catch (e) {
-      alert('Failed to acknowledge: ' + e.message);
+      alert('Failed to acknowledge/report: ' + e.message);
     }
   };
 
@@ -75,7 +83,10 @@ function AuthorityDashboardInner() {
                     {item.status === 'Acknowledged' ? (
                       <span className="text-green-600 font-semibold">Acknowledged</span>
                     ) : (
-                      <button onClick={() => acknowledge(item.caseId)} className="px-3 py-1 bg-amber-500 text-white rounded">Acknowledge</button>
+                      <div className="flex gap-2">
+                        <button onClick={() => acknowledge(item.caseId, 'ack')} className="px-3 py-1 bg-amber-500 text-white rounded">Acknowledge</button>
+                        <button onClick={() => acknowledge(item.caseId, 'report')} className="px-3 py-1 bg-red-500 text-white rounded">Report</button>
+                      </div>
                     )}
                   </td>
                 </tr>

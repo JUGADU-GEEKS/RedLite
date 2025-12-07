@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Github, Menu, X } from 'lucide-react';
+import { User, Menu, X } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 
 const Navbar = ({ darkMode, toggleDarkMode }) => {
@@ -44,6 +44,7 @@ const Navbar = ({ darkMode, toggleDarkMode }) => {
     }
 
     if (localStorage.getItem('lanezy_token')) {
+        navItems.push({ label: 'Profile', to: '/user-profile', onClick: () => navigate('/user-profile') });
         navItems.push({ label: 'Logout', to: '/', onClick: handleLogout });
     }
 
@@ -102,19 +103,19 @@ const Navbar = ({ darkMode, toggleDarkMode }) => {
                                 })}
                             </div>
 
-                            <motion.a
-                                href="https://github.com/JUGADU-GEEKS/Lanezy.git"
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className={darkMode ? 'p-2 rounded-lg bg-orange-800/12 text-gray-300 hover:text-white' : 'p-2 rounded-lg bg-orange-100/60 text-gray-600 hover:text-gray-900'}
-                                initial={{ opacity: 0, x: 20 }}
-                                animate={{ opacity: 1, x: 0 }}
-                                transition={{ duration: 0.6, delay: 0.5 }}
-                                whileTap={{ scale: 0.9 }}
-                                aria-label="GitHub Repository"
-                            >
-                                <Github size={18} />
-                            </motion.a>
+                            {localStorage.getItem('lanezy_token') ? (
+                                <motion.button
+                                    onClick={() => navigate('/user-profile')}
+                                    className={darkMode ? 'p-2 rounded-lg bg-orange-800/12 text-gray-300 hover:text-white' : 'p-2 rounded-lg bg-orange-100/60 text-gray-600 hover:text-gray-900'}
+                                    initial={{ opacity: 0, x: 20 }}
+                                    animate={{ opacity: 1, x: 0 }}
+                                    transition={{ duration: 0.6, delay: 0.5 }}
+                                    whileTap={{ scale: 0.95 }}
+                                    aria-label="Profile"
+                                >
+                                    <User size={18} />
+                                </motion.button>
+                            ) : null}
                         </div>
 
                             <motion.button

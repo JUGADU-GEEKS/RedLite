@@ -30,6 +30,7 @@ async def signup(payload: UserIn, db=Depends(get_db)):
         "email": payload.email,
         "password_hash": hash_password(payload.password),
         "name": payload.name,
+        "mobile": payload.mobile,
         "role": payload.role or "user",
         "assignedIntersections": [],
         "createdAt": now,
@@ -47,6 +48,7 @@ async def signup(payload: UserIn, db=Depends(get_db)):
         "userId": user_doc["userId"],
         "email": user_doc["email"],
         "name": user_doc["name"],
+        "mobile": user_doc.get("mobile"),
         "role": user_doc["role"],
         "assignedIntersections": user_doc["assignedIntersections"],
         "ambulanceInfo": user_doc.get("ambulanceInfo")
@@ -78,10 +80,37 @@ async def login(payload: LoginIn, db=Depends(get_db)):
             "userId": user["userId"],
             "email": user["email"],
             "name": user["name"],
+            "mobile": user.get("mobile"),
             "role": user.get("role", "user"),
             "assignedIntersections": user.get("assignedIntersections", []),
             "ambulanceInfo": user.get("ambulanceInfo"),
         },
+    }
+
+
+
+@router.get('/profile')
+async def profile(current_user=Depends(get_current_user)):
+    # Return sanitized profile for the authenticated user
+    return {
+        'status': 'success',
+        'user': {
+            'userId': current_user.get('userId'),
+            'email': current_user.get('email'),
+            'name': current_user.get('name'),
+            'mobile': current_user.get('mobile'),
+            'role': current_user.get('role'),
+            'ambulanceInfo': current_user.get('ambulanceInfo')
+        }
+    }
+
+
+@router.get('/echallans')
+async def get_echallans(current_user=Depends(get_current_user)):
+    # Placeholder implementation: return empty list and structure for future implementation
+    return {
+        'status': 'success',
+        'items': []
     }
 
 

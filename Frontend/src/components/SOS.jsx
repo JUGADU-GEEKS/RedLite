@@ -4,7 +4,7 @@ import { AlertTriangle, Phone, Shield, ArrowLeft } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import Navbar from './Navbar';
 import emer from '../assets/emer.mp4';
-import { getUser } from '../services/auth';
+import { getUser, getAuthHeaders } from '../services/auth';
 
 // Floating elements for background decoration
 const FloatingElement = ({ children, delay = 0, duration = 3 }) => (
@@ -73,7 +73,8 @@ const SOS = () => {
         if (latitude == null || longitude == null) {
           // attempt backend fallback
           try {
-            const r = await fetch(`${import.meta.env.VITE_API_URL}/get_traffic_coords`);
+            const API_BASE = import.meta.env.VITE_API_BASE || import.meta.env.VITE_API_URL || '';
+            const r = await fetch(`${API_BASE}/get_traffic_coords`);
             if (r.ok) {
               const jd = await r.json();
               const c = jd.coordinates;
@@ -100,9 +101,11 @@ const SOS = () => {
       };
 
       // POST to new SOS endpoint
-      const res = await fetch(`${import.meta.env.VITE_API_URL}/sos/send`, {
+      const API_BASE = import.meta.env.VITE_API_BASE || import.meta.env.VITE_API_URL || '';
+      const headers = { 'Content-Type': 'application/json', ...getAuthHeaders() };
+      const res = await fetch(`${API_BASE}/sos/send`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify(payload)
       });
 

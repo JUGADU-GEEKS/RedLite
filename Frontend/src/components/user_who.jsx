@@ -25,7 +25,8 @@ function UserWho() {
   const navigate = useNavigate();
 
   const handleCivilianClick = () => {
-    navigate('/home');
+    // Send the intended post-login redirect so UserAuth can forward the user
+    navigate('/user-login', { state: { redirectTo: '/home' } });
   };
 
   const handleTrafficOfficerClick = () => {

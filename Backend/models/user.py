@@ -14,6 +14,7 @@ class UserIn(BaseModel):
     email: EmailStr
     password: str
     name: str
+    mobile: Optional[str] = None
     role: Optional[str] = Field(default="user", pattern="^(user|employee|admin|ambulance_driver)$")
     ambulanceInfo: Optional[AmbulanceInfo] = None
 
@@ -22,6 +23,7 @@ class UserPublic(BaseModel):
     userId: str
     email: EmailStr
     name: str
+    mobile: Optional[str] = None
     role: str
     assignedIntersections: List[str] = []
     ambulanceInfo: Optional[AmbulanceInfo] = None
@@ -37,6 +39,7 @@ class UserDB(BaseModel):
     email: EmailStr
     password_hash: str
     name: str
+    mobile: Optional[str] = None
     role: str = Field(pattern="^(user|employee|admin|ambulance_driver)$")
     assignedIntersections: List[str] = []
     ambulanceInfo: Optional[AmbulanceInfo] = None

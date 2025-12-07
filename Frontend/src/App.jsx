@@ -13,6 +13,8 @@ import UserWho from './components/user_who';
 import ProtectedRoute from './components/ProtectedRoute';
 import LoginPage from './pages/Login';
 import SignupPage from './pages/Signup';
+import UserAuth from './pages/UserAuth';
+import UserProfile from './pages/UserProfile';
 import AdminAssign from './pages/AdminAssign';
 import IntersectionsAdmin from './pages/IntersectionsAdmin';
 import MyIntersections from './pages/MyIntersections';
@@ -37,6 +39,8 @@ function App() {
             <Route path="/dashboard/:intersectionId" element={<ProtectedRoute roles={["employee","admin"]}><LaneDashboard/></ProtectedRoute>} />
             <Route path="/lane-dashboard" element={<ProtectedRoute roles={["employee","admin"]}><LaneDashboard/></ProtectedRoute>} />
             <Route path="/sos" element={<SOS/>} />
+            <Route path="/user-login" element={<UserAuth/>} />
+            <Route path="/user-profile" element={<ProtectedRoute roles={["user","employee","admin","ambulance_driver"]}><UserProfile/></ProtectedRoute>} />
             <Route path="/team" element={<Team/>} />
             <Route path="/map" element={<MapPage/>} />
             <Route path="/potholes-map" element={<PotholesMap/>} />

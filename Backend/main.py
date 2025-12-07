@@ -236,6 +236,14 @@ except Exception as e:
     import traceback
     traceback.print_exc()
 
+# Ensure SOS router is included explicitly and log any import errors so 404s are easier to diagnose
+try:
+    from routers.sos_router import router as sos_router
+    app.include_router(sos_router)
+    logging.info('[ROUTERS] Explicitly included sos_router')
+except Exception as e:
+    logging.error(f"[ROUTERS] Failed to include sos_router explicitly: {e}", exc_info=True)
+
 from services.lane_service import get_lane_service
 from services import emergency_service
 from services.illegalParkingDetectionService import get_detection_service

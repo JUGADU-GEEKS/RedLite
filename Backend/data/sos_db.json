@@ -1767,5 +1767,248 @@
         "sid": "SMd99b699255bb2eef3a25f8a3c7d7c874"
       }
     ]
+  },
+  {
+    "caseId": "f2abb7e2eceb45bd8950f5cba2a9abf7",
+    "timestamp": "2025-12-03 17:34:12",
+    "userId": "USER-022A8573",
+    "userName": "traffic test",
+    "phone": "+919910974301",
+    "vehicle": "not provided",
+    "latitude": 28.6916608,
+    "longitude": 77.3390336,
+    "status": "Pending",
+    "authorities": [
+      {
+        "name": "Forced Target",
+        "phone": "+917703928478",
+        "lat": null,
+        "lng": null,
+        "distance_km": null
+      }
+    ],
+    "sms": [
+      {
+        "name": "Forced Target",
+        "phone": "+917703928478",
+        "status": "sent",
+        "sid": "SMe31874a8b256614e1514a5d48525af6f"
+      },
+      {
+        "name": "Secondary Verified",
+        "phone": "+919910974301",
+        "status": "sent",
+        "sid": "SMf2facade896f85a099bd5dd354a9ec32"
+      }
+    ]
+  },
+  {
+    "caseId": "da114423b4ca4bf49eb3b2c0d26961fb",
+    "timestamp": "2025-12-03 18:56:39",
+    "userId": "USER-1A508B79",
+    "userName": "Sangya Ojha",
+    "phone": "+919910974301",
+    "vehicle": "OD02 AB 2991",
+    "latitude": 28.6916608,
+    "longitude": 77.3390336,
+    "status": "Acknowledged",
+    "authorities": [
+      {
+        "name": "Forced Target",
+        "phone": "+917703928478",
+        "lat": null,
+        "lng": null,
+        "distance_km": null
+      }
+    ],
+    "sms": [
+      {
+        "name": "Forced Target",
+        "phone": "+917703928478",
+        "status": "sent",
+        "sid": "SMe9a864ab16d10a2e84028ce67141d694"
+      },
+      {
+        "name": "Secondary Verified",
+        "phone": "+919910974301",
+        "status": "sent",
+        "sid": "SMabaa24a5a546b27c301e7cc7e29f034f"
+      }
+    ],
+    "ack_time": "2025-12-03 21:36:52",
+    "ack_by": "authority"
+  },
+  {
+    "caseId": "21efdde268a3427384e158cb92d17842",
+    "timestamp": "2025-12-03 19:39:00",
+    "userId": "USER-1A508B79",
+    "userName": "Sangya Ojha",
+    "phone": "+919910974301",
+    "vehicle": "OD02 AB 2991",
+    "latitude": 28.6916608,
+    "longitude": 77.3390336,
+    "status": "Acknowledged",
+    "authorities": [
+      {
+        "name": "Forced Target",
+        "phone": "+917703928478",
+        "lat": null,
+        "lng": null,
+        "distance_km": null
+      }
+    ],
+    "sms": [
+      {
+        "name": "Forced Target",
+        "phone": "+917703928478",
+        "status": "sent",
+        "sid": "SMa8adf6df8ffc9760824371d41132c1cf"
+      },
+      {
+        "name": "Secondary Verified",
+        "phone": "+919910974301",
+        "status": "sent",
+        "sid": "SM4752cf874d790f7cd48aac461b989de3"
+      }
+    ],
+    "ack_time": "2025-12-03 20:09:43",
+    "ack_by": "authority"
+  },
+  {
+    "caseId": "dfe6f00e2b8c45b99904c235c49d1167",
+    "timestamp": "2025-12-03 19:39:48",
+    "userId": "USER-1A508B79",
+    "userName": "Sangya Ojha",
+    "phone": "+919910974301",
+    "vehicle": "OD02 AB 2991",
+    "latitude": 28.6916608,
+    "longitude": 77.3390336,
+    "status": "Acknowledged",
+    "authorities": [
+      {
+        "name": "Forced Target",
+        "phone": "+917703928478",
+        "lat": null,
+        "lng": null,
+        "distance_km": null
+      }
+    ],
+    "sms": [
+      {
+        "status": "sent",
+        "sid": "SMe6d9c1edf6a866e07a66b4ccc5f0de82",
+        "phone": "+919910974301"
+      }
+    ],
+    "ack_time": "2025-12-03 22:38:17",
+    "ack_by": "admin"
+  },
+  {
+    "caseId": "4ec60bd3880743018b1aea0841cecdc5",
+    "timestamp": "2025-12-03 19:48:22",
+    "userId": "USER-1A508B79",
+    "userName": "Sangya Ojha",
+    "phone": "+919910974301",
+    "vehicle": "OD02 AB 2991",
+    "latitude": 28.6916608,
+    "longitude": 77.3390336,
+    "status": "Acknowledged",
+    "authorities": [
+      {
+        "name": "Forced Target",
+        "phone": "+917703928478",
+        "lat": null,
+        "lng": null,
+        "distance_km": null
+      }
+    ],
+    "sms": [
+      {
+        "name": "Forced Target",
+        "phone": "+917703928478",
+        "status": "sent",
+        "sid": "SM95e4a9fa82572344fb85d143fa231df1"
+      },
+      {
+        "name": "Secondary Verified",
+        "phone": "+919910974301",
+        "status": "sent",
+        "sid": "SMb98fd032c45623d96077f1190a9d4d44"
+      }
+    ],
+    "ack_time": "2025-12-03 19:52:22",
+    "ack_by": "authority"
+  },
+  {
+    "caseId": "d9ca86795aa9452c88af5b36bd1fa064",
+    "timestamp": "2025-12-03 21:39:06",
+    "userId": "USER-DDACB31F",
+    "userName": "Kunal Sharma",
+    "phone": "+919910974301",
+    "vehicle": "OD02 AB 2981",
+    "latitude": 28.6916608,
+    "longitude": 77.3390336,
+    "status": "Acknowledged",
+    "authorities": [
+      {
+        "name": "Forced Target",
+        "phone": "+917703928478",
+        "lat": null,
+        "lng": null,
+        "distance_km": null
+      }
+    ],
+    "sms": [
+      {
+        "name": "Forced Target",
+        "phone": "+917703928478",
+        "status": "sent",
+        "sid": "SM1d2f83f1e9a525c39cab17ea2c4e30ff"
+      },
+      {
+        "name": "Secondary Verified",
+        "phone": "+919910974301",
+        "status": "sent",
+        "sid": "SM04a924f9843109dc3fd8723c0569b5d6"
+      }
+    ],
+    "ack_time": "2025-12-03 21:40:35",
+    "ack_by": "authority"
+  },
+  {
+    "caseId": "b9d3bae9a42146ea8211172f63073d56",
+    "timestamp": "2025-12-03 21:48:58",
+    "userId": "USER-022A8573",
+    "userName": "traffic test",
+    "phone": "+919910974301",
+    "vehicle": "not provided",
+    "latitude": 28.6916608,
+    "longitude": 77.3390336,
+    "status": "Acknowledged",
+    "authorities": [
+      {
+        "name": "Forced Target",
+        "phone": "+917703928478",
+        "lat": null,
+        "lng": null,
+        "distance_km": null
+      }
+    ],
+    "sms": [
+      {
+        "name": "Forced Target",
+        "phone": "+917703928478",
+        "status": "sent",
+        "sid": "SM4fcfbcf64cd3e2c7538015e4fb1764da"
+      },
+      {
+        "name": "Secondary Verified",
+        "phone": "+919910974301",
+        "status": "sent",
+        "sid": "SM4e4b84b2017c8a62e6b420565e470f25"
+      }
+    ],
+    "ack_time": "2025-12-03 21:50:55",
+    "ack_by": "authority"
   }
 ]

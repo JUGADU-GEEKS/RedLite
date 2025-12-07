@@ -1,12 +1,14 @@
-from fastapi import APIRouter, Body
+from fastapi import APIRouter, Body, Depends, HTTPException
 from fastapi.responses import JSONResponse
 import os
 import json
 import time
+import asyncio
 import uuid
 import logging
 from math import radians, cos, sin, asin, sqrt
 from dotenv import load_dotenv
+from fastapi import Request
 
 logger = logging.getLogger(__name__)
 
@@ -40,7 +42,7 @@ TWILIO_FORCE_NUMBER = os.getenv('TWILIO_FORCE_NUMBER', '+917703928478')
 
 
 @router.post("/send")
-def send_sos(data: dict = Body(...)):
+async def send_sos(data: dict = Body(...), request: Request = None):
     """Receive SOS POST and notify nearest authorities via Twilio SMS.
 
     Expected body:
@@ -55,11 +57,34 @@ def send_sos(data: dict = Body(...)):
     """
     logger.info(f"[SOS] Received payload: {data}")
 
-    # Parse user fields with tolerance for missing values
-    user_id = data.get('userId') or data.get('user_id') or 'unknown'
-    user_name = data.get('userName') or data.get('user') or 'Unknown'
-    phone = data.get('phone') or 'Not provided'
-    vehicle = data.get('vehicle') or data.get('vehicleId') or 'not provided'
+    # Resolve authenticated user from Bearer token (lazy import to avoid import-time errors)
+    user_record = None
+    try:
+        auth_header = None
+        if request:
+            auth_header = request.headers.get('authorization') or request.headers.get('Authorization')
+        token = None
+        if auth_header and auth_header.lower().startswith('bearer '):
+            token = auth_header.split(' ', 1)[1]
+        if token:
+            from services.auth_service import decode_access_token
+            payload = decode_access_token(token)
+            # lazy import get_db to fetch full user record
+            from deps.auth_deps import get_db
+            db = await get_db()
+            user_record = await db.users.find_one({
+                'userId': payload.get('userId'),
+                'email': payload.get('email')
+            })
+    except Exception:
+        user_record = None
+
+    # Use authenticated user info primarily; fall back to request body for non-sensitive fields
+    user_id = (user_record.get('userId') if user_record else None) or data.get('userId') or data.get('user_id') or 'unknown'
+    user_name = (user_record.get('name') if user_record else None) or data.get('userName') or data.get('user') or 'Unknown'
+    # Prefer mobile/phone stored on user record; if absent, use payload phone (less trusted)
+    phone = (user_record.get('mobile') if user_record else None) or (user_record.get('phone') if user_record else None) or data.get('phone') or 'Not provided'
+    vehicle = (user_record.get('vehicle') if user_record else None) or (user_record.get('vehicleId') if user_record else None) or data.get('vehicle') or data.get('vehicleId') or 'not provided'
 
     # Parse coordinates safely; allow None and handle later
     def _to_float(v):
@@ -73,11 +98,10 @@ def send_sos(data: dict = Body(...)):
     lat = _to_float(data.get('latitude') or data.get('lat') or (data.get('coords')[0] if isinstance(data.get('coords'), (list, tuple)) else None))
     lon = _to_float(data.get('longitude') or data.get('lon') or (data.get('coords')[1] if isinstance(data.get('coords'), (list, tuple)) else None))
 
+    # Require realtime coordinates from the request (do not accept hard-coded fallback)
     if lat is None or lon is None:
-        logger.warning(f"[SOS] Latitude/longitude missing or invalid in payload; lat={lat}, lon={lon}. Using fallback (0,0)")
-        # Use fallback 0,0 to avoid crashing; router will still notify verified numbers
-        lat = lat if lat is not None else 0.0
-        lon = lon if lon is not None else 0.0
+        logger.warning(f"[SOS] Latitude/longitude missing or invalid in payload; lat={lat}, lon={lon}.")
+        raise HTTPException(status_code=400, detail="latitude and longitude are required and must be valid numbers")
 
     # Load authorities DB
     auth_db_path = os.path.join(os.path.dirname(__file__), '..', 'data', 'authorities.json')
@@ -201,7 +225,7 @@ def send_sos(data: dict = Body(...)):
         second = VERIFIED_NUMBERS[1]
         logger.info(f"[SOS] TWILIO_FORCE_SINGLE: will send to second verified number {second} after 5s")
         try:
-            time.sleep(5)
+            await asyncio.sleep(5)
             sms_status = {'name': 'Secondary Verified', 'phone': second, 'status': 'skipped', 'sid': None}
             if client and twilio_from and second:
                 try:
@@ -223,9 +247,7 @@ def send_sos(data: dict = Body(...)):
 
     logger.info(f"[SOS] SMS results: {sms_results}")
 
-    # Persist SOS record
-    sos_db_path = os.path.join(os.path.dirname(__file__), '..', 'data', 'sos_db.json')
-    sos_db_path = os.path.normpath(sos_db_path)
+    # Persist SOS record to MongoDB (and fall back to file if DB unavailable)
     record = {
         'caseId': case_id,
         'timestamp': server_time,
@@ -240,8 +262,27 @@ def send_sos(data: dict = Body(...)):
         'sms': sms_results
     }
 
+    db_saved = False
     try:
-        # Ensure file exists
+        from ..deps.auth_deps import get_db
+        db = await get_db()
+        res = await db.sos.insert_one(record)
+        record['_id'] = str(res.inserted_id)
+        db_saved = True
+
+        # Also push a lightweight entry into the user's document for quick profile view
+        if user_id and user_id != 'unknown':
+            try:
+                summary = {'caseId': case_id, 'timestamp': server_time, 'status': 'Pending'}
+                await db.users.update_one({'userId': user_id}, {'$push': {'sos_history': summary}})
+            except Exception as e:
+                logger.error(f"[SOS] Failed to push sos_history into user document: {e}")
+    except Exception as e:
+        logger.warning(f"[SOS] Failed to persist SOS to MongoDB, falling back to file: {e}")
+
+    # Fallback: persist to local file as a secondary store (keeps compatibility)
+    sos_db_path = os.path.normpath(os.path.join(os.path.dirname(__file__), '..', 'data', 'sos_db.json'))
+    try:
         if not os.path.exists(sos_db_path):
             with open(sos_db_path, 'w', encoding='utf-8') as f:
                 json.dump([], f)
@@ -256,27 +297,101 @@ def send_sos(data: dict = Body(...)):
             json.dump(existing, f, indent=2)
             f.truncate()
     except Exception as e:
-        return JSONResponse({'status': 'error', 'message': f'Failed to persist SOS record: {e}'}, status_code=500)
+        logger.error(f"[SOS] Failed to persist SOS record to local file: {e}")
 
     notified = [{'name': r['name'], 'phone': r['phone'], 'status': r['status']} for r in sms_results]
 
-    return {'status': 'success', 'caseId': case_id, 'notified': notified, 'sms': sms_results}
+    result = {'status': 'success', 'caseId': case_id, 'notified': notified, 'sms': sms_results}
+    if db_saved:
+        result['stored'] = 'db'
+    else:
+        result['stored'] = 'file'
+    return result
 
 
 @router.get('/list')
 def list_sos():
-    """Return all SOS records (most recent first)."""
-    sos_db_path = os.path.normpath(os.path.join(os.path.dirname(__file__), '..', 'data', 'sos_db.json'))
+    """Return all SOS records (most recent first). Uses DB if available, else file."""
     try:
-        if not os.path.exists(sos_db_path):
-            return {'status': 'success', 'items': []}
-        with open(sos_db_path, 'r', encoding='utf-8') as f:
-            items = json.load(f)
-            items = list(reversed(items))
-            return {'status': 'success', 'items': items}
+        # try DB
+        from ..deps.auth_deps import get_db
+        # cannot await in sync function; return a helpful message to call /sos/list-async for DB-backed listing in this deployment
+        return JSONResponse({'status': 'error', 'message': 'Use /sos/list-async for DB-backed listing in this deployment'}, status_code=400)
+    except Exception:
+        sos_db_path = os.path.normpath(os.path.join(os.path.dirname(__file__), '..', 'data', 'sos_db.json'))
+        try:
+            if not os.path.exists(sos_db_path):
+                return {'status': 'success', 'items': []}
+            with open(sos_db_path, 'r', encoding='utf-8') as f:
+                items = json.load(f)
+                items = list(reversed(items))
+                return {'status': 'success', 'items': items}
+        except Exception as e:
+            logger.error(f"[SOS] Failed to read sos_db.json: {e}")
+            return JSONResponse({'status': 'error', 'message': str(e)}, status_code=500)
+
+
+@router.get('/user')
+async def user_sos(request: Request):
+    """Return SOS records for the authenticated user.
+
+    This endpoint performs lazy token decode at runtime to avoid import-time
+    dependency resolution which can fail when optional heavy packages are
+    unavailable during application startup.
+    """
+    # Resolve authenticated user from Bearer token (lazy)
+    user_record = None
+    try:
+        auth_header = request.headers.get('authorization') or request.headers.get('Authorization')
+        token = None
+        if auth_header and auth_header.lower().startswith('bearer '):
+            token = auth_header.split(' ', 1)[1]
+        if token:
+            from services.auth_service import decode_access_token
+            payload = decode_access_token(token)
+            # lazy import get_db to fetch full user record
+            from deps.auth_deps import get_db
+            db = await get_db()
+            user_record = await db.users.find_one({
+                'userId': payload.get('userId'),
+                'email': payload.get('email')
+            })
+    except Exception:
+        user_record = None
+
+    user_id = user_record.get('userId') if user_record else None
+    if not user_id:
+        raise HTTPException(status_code=401, detail='Not authenticated')
+
+    # Prefer DB-backed records
+    try:
+        from ..deps.auth_deps import get_db
+        db = await get_db()
+        items = await db.sos.find({'userId': user_id}).to_list(length=1000)
+        # Most recent first: rely on insertion order; reverse for latest-first
+        items = list(reversed(items))
+        # Convert ObjectId to string if present
+        for it in items:
+            if '_id' in it:
+                try:
+                    it['_id'] = str(it['_id'])
+                except Exception:
+                    pass
+        return {'status': 'success', 'items': items}
     except Exception as e:
-        logger.error(f"[SOS] Failed to read sos_db.json: {e}")
-        return JSONResponse({'status': 'error', 'message': str(e)}, status_code=500)
+        logger.warning(f"[SOS] DB unavailable for user_sos, falling back to file: {e}")
+        sos_db_path = os.path.normpath(os.path.join(os.path.dirname(__file__), '..', 'data', 'sos_db.json'))
+        try:
+            if not os.path.exists(sos_db_path):
+                return {'status': 'success', 'items': []}
+            with open(sos_db_path, 'r', encoding='utf-8') as f:
+                items = json.load(f)
+                user_items = [r for r in items if r.get('userId') == user_id]
+                user_items = list(reversed(user_items))
+                return {'status': 'success', 'items': user_items}
+        except Exception as e:
+            logger.error(f"[SOS] Failed to read sos_db.json for user: {e}")
+            return JSONResponse({'status': 'error', 'message': str(e)}, status_code=500)
 
 
 @router.get('/status')
@@ -295,55 +410,156 @@ def sos_status(caseId: str):
     except Exception as e:
         logger.error(f"[SOS] Failed to read sos_db.json for status: {e}")
         return JSONResponse({'status': 'error', 'message': str(e)}, status_code=500)
-
-
 @router.post('/acknowledge')
-def acknowledge_sos(data: dict = Body(...)):
-    """Acknowledge a SOS case by caseId (no SMS)."""
+async def acknowledge_sos(data: dict = Body(...), request: Request = None):
+    """Acknowledge or report a SOS case by delegating to the ack_service.
+
+    This wrapper keeps ack logic separate from send_sos so the SOS send
+    logic remains untouched. It calls `services.ack_service.acknowledge_case`.
+    """
     case_id = data.get('caseId')
     if not case_id:
         return JSONResponse({'status': 'error', 'message': 'caseId required'}, status_code=400)
 
-    sos_db_path = os.path.normpath(os.path.join(os.path.dirname(__file__), '..', 'data', 'sos_db.json'))
+    action = data.get('action') or 'ack'
+    ack_by = data.get('ackBy') or 'authority'
+
     try:
-        if not os.path.exists(sos_db_path):
-            return JSONResponse({'status': 'error', 'message': 'No records'}, status_code=404)
-        with open(sos_db_path, 'r+', encoding='utf-8') as f:
-            try:
-                items = json.load(f)
-            except Exception:
-                items = []
-            found = False
-            for r in items:
-                if r.get('caseId') == case_id:
-                    r['status'] = 'Acknowledged'
-                    r['ack_time'] = time.strftime('%Y-%m-%d %H:%M:%S')
-                    r['ack_by'] = data.get('ackBy', 'authority')
-                    found = True
-                    break
-            if not found:
-                return JSONResponse({'status': 'error', 'message': 'caseId not found'}, status_code=404)
-            f.seek(0)
-            json.dump(items, f, indent=2)
-            f.truncate()
-        return {'status': 'success', 'caseId': case_id}
+        from services.ack_service import acknowledge_case
+        res = await acknowledge_case(case_id=case_id, action=action, ack_by=ack_by, request=request)
+        return res
     except Exception as e:
-        logger.error(f"[SOS] Failed to persist acknowledgement: {e}")
+        logger.error(f"[SOS] ack wrapper failed: {e}")
         return JSONResponse({'status': 'error', 'message': str(e)}, status_code=500)
 
 
-@router.get('/last')
-def last_sos():
-    """Return the most recent SOS record for debugging."""
-    sos_db_path = os.path.normpath(os.path.join(os.path.dirname(__file__), '..', 'data', 'sos_db.json'))
+@router.get('/debug/resolve/{caseId}')
+async def debug_resolve_phone(caseId: str, request: Request = None):
+    """Debug helper: show the SOS record and the phone that would be resolved for ack.
+
+    Returns: { record: {...}, resolved_phone: "+919..." }
+    """
     try:
-        if not os.path.exists(sos_db_path):
-            return {'status': 'success', 'item': None}
-        with open(sos_db_path, 'r', encoding='utf-8') as f:
-            items = json.load(f)
-            if not items:
-                return {'status': 'success', 'item': None}
-            return {'status': 'success', 'item': items[-1]}
+        from services.ack_service import _resolve_user_phone
+        # Try DB first
+        try:
+            from deps.auth_deps import get_db
+            db = await get_db()
+            rec = await db.sos.find_one({'caseId': caseId})
+            resolved = await _resolve_user_phone(rec, request)
+            return {'status': 'success', 'record': rec, 'resolved_phone': resolved}
+        except Exception:
+            # fallback to file
+            sos_db_path = os.path.normpath(os.path.join(os.path.dirname(__file__), '..', 'data', 'sos_db.json'))
+            if not os.path.exists(sos_db_path):
+                return JSONResponse({'status': 'error', 'message': 'No records'}, status_code=404)
+            with open(sos_db_path, 'r', encoding='utf-8') as f:
+                items = json.load(f)
+                for r in items:
+                    if r.get('caseId') == caseId:
+                        resolved = await _resolve_user_phone(r, request)
+                        return {'status': 'success', 'record': r, 'resolved_phone': resolved}
+            return JSONResponse({'status': 'error', 'message': 'caseId not found'}, status_code=404)
     except Exception as e:
-        logger.error(f"[SOS] Failed to read last sos record: {e}")
+        logger.error(f"[SOS] debug_resolve_phone failed: {e}")
+        return JSONResponse({'status': 'error', 'message': str(e)}, status_code=500)
+
+
+@router.get('/twilio-status/{caseId}')
+async def twilio_status(caseId: str):
+    """Return Twilio delivery status for every Message SID recorded for a caseId.
+
+    Response: { status: 'success', items: [{ sid, phone, twilio_status, error_code, error_message }] }
+    """
+    # Load record from DB or file
+    record = None
+    try:
+        from deps.auth_deps import get_db
+        db = await get_db()
+        record = await db.sos.find_one({'caseId': caseId})
+    except Exception:
+        try:
+            sos_db_path = os.path.normpath(os.path.join(os.path.dirname(__file__), '..', 'data', 'sos_db.json'))
+            if not os.path.exists(sos_db_path):
+                return JSONResponse({'status': 'error', 'message': 'No records'}, status_code=404)
+            with open(sos_db_path, 'r', encoding='utf-8') as f:
+                items = json.load(f)
+                for r in items:
+                    if r.get('caseId') == caseId:
+                        record = r
+                        break
+        except Exception as e:
+            logger.error(f"[SOS] twilio_status failed to load record: {e}")
+            return JSONResponse({'status': 'error', 'message': str(e)}, status_code=500)
+
+    if not record:
+        return JSONResponse({'status': 'error', 'message': 'caseId not found'}, status_code=404)
+
+    # Collect SIDs
+    sids = []
+    for s in record.get('sms', []) or []:
+        sid = s.get('sid')
+        phone = s.get('phone') or s.get('to')
+        if sid:
+            sids.append({'sid': sid, 'phone': phone})
+
+    if not sids:
+        return {'status': 'success', 'items': [], 'message': 'No Twilio SIDs recorded for this case'}
+
+    # Init Twilio client
+    tw_sid = os.getenv('TWILIO_ACCOUNT_SID')
+    tw_token = os.getenv('TWILIO_AUTH_TOKEN')
+    if not (tw_sid and tw_token):
+        return JSONResponse({'status': 'error', 'message': 'Twilio credentials not configured'}, status_code=500)
+
+    try:
+        from twilio.rest import Client
+        client = Client(tw_sid, tw_token)
+    except Exception as e:
+        logger.error(f"[SOS] Failed to init Twilio client for status check: {e}")
+        return JSONResponse({'status': 'error', 'message': str(e)}, status_code=500)
+
+    loop = asyncio.get_event_loop()
+    results = []
+    for item in sids:
+        sid = item['sid']
+        phone = item.get('phone')
+
+        def _fetch(sid_local):
+            try:
+                m = client.messages(sid_local).fetch()
+                return {
+                    'status': getattr(m, 'status', None),
+                    'error_code': getattr(m, 'error_code', None),
+                    'error_message': getattr(m, 'error_message', None),
+                    'to': getattr(m, 'to', None),
+                    'from': getattr(m, 'from_', None)
+                }
+            except Exception as e:
+                return {'status': 'error', 'error': str(e)}
+
+        tw = await loop.run_in_executor(None, _fetch, sid)
+        results.append({'sid': sid, 'phone': phone, 'twilio': tw})
+
+    return {'status': 'success', 'items': results}
+
+
+@router.post('/admin/test-ack')
+async def admin_test_ack(data: dict = Body(...), request: Request = None):
+    """Admin test endpoint: trigger an ACK flow for a given caseId targeting the user's phone.
+
+    Body: { caseId: string }
+    Returns the same payload as `acknowledge_case`.
+    """
+    case_id = data.get('caseId')
+    if not case_id:
+        return JSONResponse({'status': 'error', 'message': 'caseId required'}, status_code=400)
+
+    try:
+        from services.ack_service import acknowledge_case
+        # Use ack_by='admin' to mark this as a manual test
+        res = await acknowledge_case(case_id=case_id, action='ack', ack_by='admin', request=request)
+        return res
+    except Exception as e:
+        logger.error(f"[SOS] admin_test_ack failed for {case_id}: {e}")
         return JSONResponse({'status': 'error', 'message': str(e)}, status_code=500)
