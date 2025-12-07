@@ -1,7 +1,7 @@
 import React from 'react';
 import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
-import { User, Shield } from 'lucide-react';
+import { User, Shield, ShieldCheck, Ambulance } from 'lucide-react';
 
 // Floating elements for background decoration (same as landing page)
 const FloatingElement = ({ children, delay = 0, duration = 3 }) => (
@@ -30,6 +30,14 @@ function UserWho() {
   };
 
   const handleTrafficOfficerClick = () => {
+    navigate('/login');
+  };
+
+  const handleAdminClick = () => {
+    navigate('/login');
+  };
+
+  const handleAmbulanceDriverClick = () => {
     navigate('/login');
   };
 
@@ -90,11 +98,11 @@ function UserWho() {
               You're a
             </h2>
 
-            <div className="space-y-6">
+            <div className="space-y-5">
               {/* Civilian Button */}
               <motion.button
                 onClick={handleCivilianClick}
-                className="w-full group px-8 py-6 rounded-2xl bg-gradient-to-r from-yellow-500 via-amber-500 to-orange-400 text-white font-semibold shadow-2xl shadow-yellow-500/25 hover:shadow-yellow-500/40 transition-all duration-300 border border-white/20"
+                className="w-full group px-6 py-5 rounded-2xl bg-gradient-to-r from-yellow-500 via-amber-500 to-orange-400 text-white font-semibold shadow-2xl shadow-yellow-500/25 hover:shadow-yellow-500/40 transition-all duration-300 border border-white/20"
                 whileHover={{ scale: 1.02, y: -2 }}
                 whileTap={{ scale: 0.98 }}
                 initial={{ opacity: 0, x: -20 }}
@@ -102,15 +110,15 @@ function UserWho() {
                 transition={{ delay: 0.5, duration: 0.6 }}
               >
                 <div className="flex items-center justify-center space-x-3">
-                  <User className="w-6 h-6" />
-                  <span className="text-xl">Civilian</span>
+                  <User className="w-5 h-5" />
+                  <span className="text-lg">Civilian</span>
                   <motion.span
                     className="group-hover:translate-x-1 transition-transform duration-300"
                   >
                     →
                   </motion.span>
                 </div>
-                <p className="text-sm text-yellow-100 mt-2 opacity-90">
+                <p className="text-xs text-yellow-100 mt-1.5 opacity-90">
                   Access traffic updates and report issues
                 </p>
               </motion.button>
@@ -118,24 +126,72 @@ function UserWho() {
               {/* Traffic Officer Button */}
               <motion.button
                 onClick={handleTrafficOfficerClick}
-                className="w-full group px-8 py-6 rounded-2xl bg-gradient-to-r from-amber-500 via-orange-500 to-red-500 text-white font-semibold shadow-2xl shadow-orange-500/25 hover:shadow-orange-500/40 transition-all duration-300 border border-white/20"
+                className="w-full group px-6 py-5 rounded-2xl bg-gradient-to-r from-amber-500 via-orange-500 to-red-500 text-white font-semibold shadow-2xl shadow-orange-500/25 hover:shadow-orange-500/40 transition-all duration-300 border border-white/20"
                 whileHover={{ scale: 1.02, y: -2 }}
                 whileTap={{ scale: 0.98 }}
                 initial={{ opacity: 0, x: 20 }}
                 animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: 0.7, duration: 0.6 }}
+                transition={{ delay: 0.6, duration: 0.6 }}
               >
                 <div className="flex items-center justify-center space-x-3">
-                  <Shield className="w-6 h-6" />
-                  <span className="text-xl">Traffic Officer</span>
+                  <Shield className="w-5 h-5" />
+                  <span className="text-lg">Traffic Officer</span>
                   <motion.span
                     className="group-hover:translate-x-1 transition-transform duration-300"
                   >
                     →
                   </motion.span>
                 </div>
-                <p className="text-sm text-orange-100 mt-2 opacity-90">
+                <p className="text-xs text-orange-100 mt-1.5 opacity-90">
                   Manage traffic systems and controls
+                </p>
+              </motion.button>
+
+              {/* Admin Button */}
+              <motion.button
+                onClick={handleAdminClick}
+                className="w-full group px-6 py-5 rounded-2xl bg-gradient-to-r from-purple-500 via-indigo-500 to-blue-500 text-white font-semibold shadow-2xl shadow-purple-500/25 hover:shadow-purple-500/40 transition-all duration-300 border border-white/20"
+                whileHover={{ scale: 1.02, y: -2 }}
+                whileTap={{ scale: 0.98 }}
+                initial={{ opacity: 0, x: -20 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: 0.7, duration: 0.6 }}
+              >
+                <div className="flex items-center justify-center space-x-3">
+                  <ShieldCheck className="w-5 h-5" />
+                  <span className="text-lg">Admin</span>
+                  <motion.span
+                    className="group-hover:translate-x-1 transition-transform duration-300"
+                  >
+                    →
+                  </motion.span>
+                </div>
+                <p className="text-xs text-purple-100 mt-1.5 opacity-90">
+                  Full system administration and oversight
+                </p>
+              </motion.button>
+
+              {/* Ambulance Driver Button */}
+              <motion.button
+                onClick={handleAmbulanceDriverClick}
+                className="w-full group px-6 py-5 rounded-2xl bg-gradient-to-r from-red-500 via-rose-500 to-pink-500 text-white font-semibold shadow-2xl shadow-red-500/25 hover:shadow-red-500/40 transition-all duration-300 border border-white/20"
+                whileHover={{ scale: 1.02, y: -2 }}
+                whileTap={{ scale: 0.98 }}
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: 0.8, duration: 0.6 }}
+              >
+                <div className="flex items-center justify-center space-x-3">
+                  <Ambulance className="w-5 h-5" />
+                  <span className="text-lg">Ambulance Driver</span>
+                  <motion.span
+                    className="group-hover:translate-x-1 transition-transform duration-300"
+                  >
+                    →
+                  </motion.span>
+                </div>
+                <p className="text-xs text-red-100 mt-1.5 opacity-90">
+                  Emergency response and priority routing
                 </p>
               </motion.button>
             </div>

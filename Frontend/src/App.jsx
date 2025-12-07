@@ -47,6 +47,8 @@ function App() {
             <Route path="/emergency" element={<Alert/>} />
             <Route path="/issue" element={<Issue/>} />
             <Route path="/admin" element={<ProtectedRoute roles={["admin"]}><AdminAssign/></ProtectedRoute>} />
+            {/** Admin root route disabled per request */}
+            {/** <Route path="/admin" element={<ProtectedRoute roles={["admin"]}><AdminAssign/></ProtectedRoute>} /> */}
             <Route path="/admin/intersections" element={<ProtectedRoute roles={["admin"]}><IntersectionsAdmin/></ProtectedRoute>} />
             <Route path="/my-intersections" element={<ProtectedRoute roles={["employee"]}><MyIntersections/></ProtectedRoute>} />
             <Route path="/wrong-side" element={<ProtectedRoute roles={["admin", "employee"]}><WrongSide/></ProtectedRoute>} />

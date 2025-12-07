@@ -19,27 +19,43 @@ const Navbar = ({ darkMode, toggleDarkMode }) => {
     };
 
     let navItems = [];
-    if (role === 'admin') {
+    if (role === 'ambulance_driver') {
+        // Ambulance Driver: SOS, Logout
+        navItems = [
+            { label: 'SOS', to: '/sos', onClick: () => navigate('/sos') },
+        ];
+    } else if (role === 'user') {
+        // Civilian: Home, SOS, Report Issue, Logout
         navItems = [
             { label: 'Home', to: '/home', onClick: () => navigate('/home') },
-            { label: 'Dashboard', to: '/dashboard', onClick: () => navigate('/dashboard') },
-            { label: 'Manage Intersections', to: '/admin/intersections', onClick: () => navigate('/admin/intersections') },
-            { label: 'Illegal Parking', to: '/illegal-parking', onClick: () => navigate('/illegal-parking') },
+            { label: 'SOS', to: '/sos', onClick: () => navigate('/sos') },
+            { label: 'Report Issue', to: '/issue', onClick: () => navigate('/issue') },
         ];
     } else if (role === 'employee') {
+        // Traffic Officer: My Intersections, Wrong Side, Illegal Parking, Logout
         navItems = [
-            { label: 'Home', to: '/home', onClick: () => navigate('/home') },
-            { label: 'Dashboard', to: '/dashboard', onClick: () => navigate('/dashboard') },
             { label: 'My Intersections', to: '/my-intersections', onClick: () => navigate('/my-intersections') },
             { label: 'Wrong Side', to: '/wrong-side', onClick: () => navigate('/wrong-side') },
             { label: 'Illegal Parking', to: '/illegal-parking', onClick: () => navigate('/illegal-parking') },
         ];
-    } else {
+    } else if (role === 'admin') {
+        // Admin: all routes visible except /dashboard
         navItems = [
             { label: 'Home', to: '/home', onClick: () => navigate('/home') },
+            { label: 'Manage Intersections', to: '/admin/intersections', onClick: () => navigate('/admin/intersections') },
+            // { label: 'My Intersections', to: '/my-intersections', onClick: () => navigate('/my-intersections') },
+            { label: 'Wrong Side', to: '/wrong-side', onClick: () => navigate('/wrong-side') },
+            { label: 'Illegal Parking', to: '/illegal-parking', onClick: () => navigate('/illegal-parking') },
             { label: 'SOS', to: '/sos', onClick: () => navigate('/sos') },
-            { label: 'Report issue', to: '/issue', onClick: () => navigate('/issue') },
+            { label: 'Map', to: '/map', onClick: () => navigate('/map') },
             { label: 'Potholes Map', to: '/potholes-map', onClick: () => navigate('/potholes-map') },
+            { label: 'Issue', to: '/issue', onClick: () => navigate('/issue') },
+            // Intentionally omit Dashboard route
+        ];
+    } else {
+        // Default fallback (unauthenticated or unknown role): minimal
+        navItems = [
+            { label: 'Home', to: '/home', onClick: () => navigate('/home') },
         ];
     }
 
@@ -101,7 +117,8 @@ const Navbar = ({ darkMode, toggleDarkMode }) => {
                                         </motion.a>
                                     );
                                 })}
-                            </div>
+
+                            {/** GitHub link removed per request */}
 
                             {localStorage.getItem('lanezy_token') ? (
                                 <motion.button
