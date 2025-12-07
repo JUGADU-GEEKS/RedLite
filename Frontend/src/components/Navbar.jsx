@@ -20,14 +20,16 @@ const Navbar = ({ darkMode, toggleDarkMode }) => {
 
     let navItems = [];
     if (role === 'ambulance_driver') {
-        // Ambulance Driver: SOS, Logout
+        // Ambulance Driver: Tow Help, Logout
         navItems = [
-            { label: 'SOS', to: '/sos', onClick: () => navigate('/sos') },
+            { label: 'Tow Help', to: '/sos', onClick: () => navigate('/sos') },
         ];
     } else if (role === 'user') {
-        // Civilian: Home, SOS, Report Issue, Logout
+        // Civilian: Home, Tow Help, Report Issue, Logout
         navItems = [
             { label: 'Home', to: '/home', onClick: () => navigate('/home') },
+            { label: 'Tow Help', to: '/sos', onClick: () => navigate('/sos') },
+            { label: 'Potholes Map', to: '/potholes-map', onClick: () => navigate('/potholes-map') },
             { label: 'Report Issue', to: '/issue', onClick: () => navigate('/issue') },
             { label: 'Profile', to: '/user-profile', onClick: () => navigate('/user-profile') },
         ];
@@ -43,11 +45,10 @@ const Navbar = ({ darkMode, toggleDarkMode }) => {
         navItems = [
             { label: 'Home', to: '/home', onClick: () => navigate('/home') },
             { label: 'Manage Intersections', to: '/admin/intersections', onClick: () => navigate('/admin/intersections') },
-            // { label: 'My Intersections', to: '/my-intersections', onClick: () => navigate('/my-intersections') },
-            { label: 'Wrong Side', to: '/wrong-side', onClick: () => navigate('/wrong-side') },
-            { label: 'Illegal Parking', to: '/illegal-parking', onClick: () => navigate('/illegal-parking') },
-            { label: 'SOS', to: '/sos', onClick: () => navigate('/sos') },
-            { label: 'Map', to: '/map', onClick: () => navigate('/map') },
+            // { label: 'Wrong Side', to: '/wrong-side', onClick: () => navigate('/wrong-side') },
+            // { label: 'Illegal Parking', to: '/illegal-parking', onClick: () => navigate('/illegal-parking') },
+            // { label: 'Tow Help', to: '/sos', onClick: () => navigate('/sos') },
+            // { label: 'Map', to: '/map', onClick: () => navigate('/map') },
             { label: 'Potholes Map', to: '/potholes-map', onClick: () => navigate('/potholes-map') },
             { label: 'Approvals', to: '/authority/dashboard', onClick: () => navigate('/authority/dashboard') },
             // Intentionally omit Dashboard route
