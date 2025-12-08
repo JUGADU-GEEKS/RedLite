@@ -64,6 +64,12 @@ export default function UserProfile(){
                     <div className="text-lg font-semibold">{profile.name}</div>
                     <div className="text-sm text-gray-600">{profile.email}</div>
                     <div className="mt-2 text-sm text-gray-700">{profile.mobile || 'Not provided'}</div>
+                    <div className="mt-2 text-sm text-red-600 font-bold">
+                      Fault tolerance: {profile.fault_count || 0} / 3
+                      {profile.suspended && (
+                        <div className="text-red-700 font-bold mt-1">Account suspended due to repeated fake requests.</div>
+                      )}
+                    </div>
                   </div>
                 </div>
               </div>

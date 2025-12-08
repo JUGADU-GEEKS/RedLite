@@ -2010,5 +2010,166 @@
     ],
     "ack_time": "2025-12-03 21:50:55",
     "ack_by": "authority"
+  },
+  {
+    "caseId": "4fb855eb02174e8490f401c56ed54cec",
+    "timestamp": "2025-12-09 00:31:02",
+    "userId": "USER-10E95E3B",
+    "userName": "papa",
+    "phone": "+919910974301",
+    "vehicle": "not provided",
+    "latitude": 21.4953009,
+    "longitude": 83.9002918,
+    "status": "Reported",
+    "authorities": [
+      {
+        "name": "Forced Target",
+        "phone": "+917703928478",
+        "lat": null,
+        "lng": null,
+        "distance_km": null
+      }
+    ],
+    "sms": [],
+    "ack_time": "2025-12-09 01:21:09",
+    "ack_by": "authority"
+  },
+  {
+    "caseId": "b97daa095789440997995519090a3003",
+    "timestamp": "2025-12-09 00:59:55",
+    "userId": "USER-10E95E3B",
+    "userName": "papa",
+    "phone": "+919910974301",
+    "vehicle": "not provided",
+    "latitude": 21.4953009,
+    "longitude": 83.9002918,
+    "status": "Reported",
+    "authorities": [
+      {
+        "name": "Forced Target",
+        "phone": "+917703928478",
+        "lat": null,
+        "lng": null,
+        "distance_km": null
+      }
+    ],
+    "sms": [],
+    "ack_time": "2025-12-09 01:21:04",
+    "ack_by": "authority"
+  },
+  {
+    "caseId": "a4bbd2bc0fc64fd8aad88e068a179ce0",
+    "timestamp": "2025-12-09 01:15:49",
+    "userId": "USER-10E95E3B",
+    "userName": "papa",
+    "phone": "+919910974301",
+    "vehicle": "not provided",
+    "latitude": 21.4953009,
+    "longitude": 83.9002918,
+    "status": "Reported",
+    "authorities": [
+      {
+        "name": "Forced Target",
+        "phone": "+917703928478",
+        "lat": null,
+        "lng": null,
+        "distance_km": null
+      }
+    ],
+    "sms": [],
+    "ack_time": "2025-12-09 01:18:32",
+    "ack_by": "authority"
+  },
+  {
+    "caseId": "0b84ea411748440c80e2d09c75c00a26",
+    "timestamp": "2025-12-09 01:31:18",
+    "userId": "USER-158BC1F7",
+    "userName": "XYZ",
+    "phone": "+919910974301",
+    "vehicle": "not provided",
+    "latitude": 21.4953009,
+    "longitude": 83.9002918,
+    "status": "Reported",
+    "authorities": [
+      {
+        "name": "Forced Target",
+        "phone": "+917703928478",
+        "lat": null,
+        "lng": null,
+        "distance_km": null
+      }
+    ],
+    "sms": [],
+    "ack_time": "2025-12-09 01:31:41",
+    "ack_by": "authority"
+  },
+  {
+    "caseId": "22b8e0af6c0e48a6b882045c089a9910",
+    "timestamp": "2025-12-09 01:39:32",
+    "userId": "USER-158BC1F7",
+    "userName": "XYZ",
+    "phone": "+919910974301",
+    "vehicle": "not provided",
+    "latitude": 21.4953009,
+    "longitude": 83.9002918,
+    "status": "Reported",
+    "authorities": [
+      {
+        "name": "Forced Target",
+        "phone": "+917703928478",
+        "lat": null,
+        "lng": null,
+        "distance_km": null
+      }
+    ],
+    "sms": [],
+    "ack_time": "2025-12-09 01:39:57",
+    "ack_by": "authority"
+  },
+  {
+    "caseId": "f4b677e5cf62424c92d5b359477bda69",
+    "timestamp": "2025-12-09 01:40:43",
+    "userId": "USER-158BC1F7",
+    "userName": "XYZ",
+    "phone": "+919910974301",
+    "vehicle": "not provided",
+    "latitude": 21.4953009,
+    "longitude": 83.9002918,
+    "status": "Reported",
+    "authorities": [
+      {
+        "name": "Forced Target",
+        "phone": "+917703928478",
+        "lat": null,
+        "lng": null,
+        "distance_km": null
+      }
+    ],
+    "sms": [],
+    "ack_time": "2025-12-09 01:41:52",
+    "ack_by": "authority"
+  },
+  {
+    "caseId": "efa58cf2a7b74ff6a4220ab3c035d385",
+    "timestamp": "2025-12-09 01:41:36",
+    "userId": "USER-158BC1F7",
+    "userName": "XYZ",
+    "phone": "+919910974301",
+    "vehicle": "not provided",
+    "latitude": 21.4957121,
+    "longitude": 83.9024843,
+    "status": "Reported",
+    "authorities": [
+      {
+        "name": "Forced Target",
+        "phone": "+917703928478",
+        "lat": null,
+        "lng": null,
+        "distance_km": null
+      }
+    ],
+    "sms": [],
+    "ack_time": "2025-12-09 01:41:55",
+    "ack_by": "authority"
   }
 ]

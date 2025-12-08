@@ -60,6 +60,8 @@ async def login(payload: LoginIn, db=Depends(get_db)):
     user = await db.users.find_one({"email": payload.email})
     if not user:
         raise HTTPException(status_code=401, detail="Invalid credentials")
+    if user.get("suspended", False):
+        raise HTTPException(status_code=403, detail="Account suspended due to repeated fake requests.")
     if not verify_password(payload.password, user.get("password_hash", "")):
         raise HTTPException(status_code=401, detail="Invalid credentials")
 
@@ -84,6 +86,8 @@ async def login(payload: LoginIn, db=Depends(get_db)):
             "role": user.get("role", "user"),
             "assignedIntersections": user.get("assignedIntersections", []),
             "ambulanceInfo": user.get("ambulanceInfo"),
+            "fault_count": user.get("fault_count", 0),
+            "suspended": user.get("suspended", False),
         },
     }
 
@@ -91,7 +95,7 @@ async def login(payload: LoginIn, db=Depends(get_db)):
 
 @router.get('/profile')
 async def profile(current_user=Depends(get_current_user)):
-    # Return sanitized profile for the authenticated user
+    # Return sanitized profile for the authenticated user, including fault_count and suspended
     return {
         'status': 'success',
         'user': {
@@ -100,7 +104,9 @@ async def profile(current_user=Depends(get_current_user)):
             'name': current_user.get('name'),
             'mobile': current_user.get('mobile'),
             'role': current_user.get('role'),
-            'ambulanceInfo': current_user.get('ambulanceInfo')
+            'ambulanceInfo': current_user.get('ambulanceInfo'),
+            'fault_count': current_user.get('fault_count', 0),
+            'suspended': current_user.get('suspended', False)
         }
     }
 

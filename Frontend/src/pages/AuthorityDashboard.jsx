@@ -80,14 +80,16 @@ function AuthorityDashboardInner() {
                   <td className="px-3 py-2">{item.timestamp}</td>
                   <td className="px-3 py-2">{item.status || 'Pending'}</td>
                   <td className="px-3 py-2">
-                    {item.status === 'Acknowledged' ? (
-                      <span className="text-green-600 font-semibold">Acknowledged</span>
-                    ) : (
-                      <div className="flex gap-2">
-                        <button onClick={() => acknowledge(item.caseId, 'ack')} className="px-3 py-1 bg-amber-500 text-white rounded">Acknowledge</button>
-                        <button onClick={() => acknowledge(item.caseId, 'report')} className="px-3 py-1 bg-red-500 text-white rounded">Report</button>
-                      </div>
-                    )}
+                    <div className="flex gap-2">
+                      {item.status === 'Reported' ? null : (
+                        <>
+                          {item.status !== 'Acknowledged' && (
+                            <button onClick={() => acknowledge(item.caseId, 'ack')} className="px-3 py-1 bg-amber-500 text-white rounded">Acknowledge</button>
+                          )}
+                          <button onClick={() => acknowledge(item.caseId, 'report')} className="px-3 py-1 bg-red-500 text-white rounded">Report</button>
+                        </>
+                      )}
+                    </div>
                   </td>
                 </tr>
               ))}

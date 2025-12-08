@@ -45,3 +45,5 @@ class UserDB(BaseModel):
     ambulanceInfo: Optional[AmbulanceInfo] = None
     createdAt: datetime
     updatedAt: datetime
+    fault_count: int = 0
+    suspended: bool = False
