@@ -1,10 +1,16 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useParams } from 'react-router-dom';
-import LaneCard from '../components/LaneCard';
-import { useAuth } from '../services/auth';
-import Navbar from '../components/Navbar';
 import { motion } from 'framer-motion';
+import LaneCard from '../components/LaneCard';
+import Navbar from '../components/Navbar';
+import { useAuth } from '../services/auth';
 
+// README: Priority round-robin timing.
+// - Cycle order is given by priorityOrder; it defines the deterministic loop.
+// - Waiting time for a lane = active remaining + sum of green durations of
+//   lanes encountered after the active lane (following priorityOrder) until
+//   that lane is reached. Active lane shows its own remaining.
+// - Non-active lanes clamp to >= 1s to avoid 0s flicker.
 const LaneDashboard = () => {
   const { intersectionId } = useParams();
   const [data, setData] = useState({});
@@ -13,13 +19,66 @@ const LaneDashboard = () => {
   const { token } = useAuth() || {};
 
   const lastGreenLaneRef = useRef(null); // track last spoken green lane
+  const [durations, setDurations] = useState({});
+  const durationsRef = useRef({});
+  const [priorityOrder, setPriorityOrder] = useState([]);
+  const priorityOrderRef = useRef([]);
+  const [activeLane, setActiveLane] = useState(null);
+  const activeLaneRef = useRef(null);
+  const [remaining, setRemaining] = useState(0);
+  const [waitingTimes, setWaitingTimes] = useState({});
 
-  const API_BASE = import.meta.env.VITE_API_BASE || "http://localhost:8000";
+  const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:8000';
+
+  const lanes = ['north', 'east', 'south', 'west'];
+
+  const calculateWaitingTimesPriorityRoundRobin = (lanesArr, order, durationMap, laneActive, activeRemaining) => {
+    if (!laneActive || !lanesArr.length) return {};
+    const fullOrder = (order && order.length ? order : lanesArr).filter(Boolean);
+    const allLanes = Array.from(new Set([...fullOrder, ...lanesArr]));
+    const activeIdx = allLanes.indexOf(laneActive);
+    if (activeIdx === -1) return {};
+    const activeDuration = durationMap?.[laneActive] ?? 0;
+    const safeRemaining = Math.min(Math.max(activeRemaining ?? 0, 0), activeDuration);
+
+    return allLanes.reduce((acc, lane) => {
+      if (lane === laneActive) {
+        acc[lane] = safeRemaining;
+        return acc;
+      }
+
+      let sum = safeRemaining;
+      let cursor = activeIdx;
+      while (true) {
+        cursor = (cursor + 1) % allLanes.length;
+        const cursorLane = allLanes[cursor];
+        if (cursorLane === lane || cursor === activeIdx) {
+          break; // do not include target lane duration
+        }
+        sum += durationMap?.[cursorLane] ?? 0;
+      }
+
+      acc[lane] = sum <= 0 ? 1 : sum;
+      return acc;
+    }, {});
+  };
+
+  // Quick correctness harness (logs once)
+  useEffect(() => {
+    const sampleLanes = ['N', 'E', 'S', 'W'];
+    const sampleDur = { N: 15, E: 60, S: 45, W: 30 };
+    console.log('Waiting sample active N remaining 15', calculateWaitingTimesPriorityRoundRobin(sampleLanes, sampleLanes, sampleDur, 'N', 15));
+    console.log('Waiting sample active E remaining 6', calculateWaitingTimesPriorityRoundRobin(sampleLanes, sampleLanes, sampleDur, 'E', 6));
+    // When remaining is 0 we expect to switch to next lane (W) with its duration.
+    const waitsS0 = calculateWaitingTimesPriorityRoundRobin(sampleLanes, sampleLanes, sampleDur, 'S', 0);
+    const nextLaneFromS = sampleLanes[(sampleLanes.indexOf('S') + 1) % sampleLanes.length];
+    console.log('Waiting sample active S remaining 0', { waits: waitsS0, nextLane: nextLaneFromS, nextLaneDuration: sampleDur[nextLaneFromS] });
+  }, []);
 
   useEffect(() => {
     const fetchSignalStatus = async () => {
       if (!intersectionId) return;
-      
+
       try {
         const response = await fetch(`${API_BASE}/signal_status/${intersectionId}`);
         if (response.ok) {
@@ -60,9 +119,9 @@ const LaneDashboard = () => {
             const pickFemaleVoice = (voices) => {
               // Prefer known female voice names, then en-US voices, then fallback
               const femaleNames = /female|zira|samantha|kendra|joanna|amy|susan|kate|victoria|alloy|nicky|alyssa|maria/i;
-              let v = voices.find(v => femaleNames.test(v.name));
-              if (!v) v = voices.find(v => v.lang && v.lang.toLowerCase().startsWith('en-us'));
-              if (!v) v = voices.find(v => v.lang && v.lang.toLowerCase().startsWith('en'));
+              let v = voices.find((v) => femaleNames.test(v.name));
+              if (!v) v = voices.find((v) => v.lang && v.lang.toLowerCase().startsWith('en-us'));
+              if (!v) v = voices.find((v) => v.lang && v.lang.toLowerCase().startsWith('en'));
               if (!v) v = voices[0];
               return v;
             };
@@ -95,7 +154,7 @@ const LaneDashboard = () => {
   }, [signalStatus]);
 
   useEffect(() => {
-    const ws = new WebSocket(`ws://localhost:8000/ws/lane_feed`);
+    const ws = new WebSocket('ws://localhost:8000/ws/lane_feed');
 
     ws.onopen = () => {
       console.log('WebSocket connected');
@@ -104,12 +163,30 @@ const LaneDashboard = () => {
     ws.onmessage = (event) => {
       const message = JSON.parse(event.data);
       setData(message);
+      if (message.durations) {
+        setDurations(message.durations);
+        durationsRef.current = message.durations;
+      }
+      if (message.priority_order && Array.isArray(message.priority_order)) {
+        const mergedOrder = Array.from(new Set([...message.priority_order, ...lanes]));
+        setPriorityOrder(mergedOrder);
+        priorityOrderRef.current = mergedOrder;
+      }
+      if (message.lane) {
+        setActiveLane(message.lane);
+        activeLaneRef.current = message.lane;
+      }
+      if (message.remaining !== undefined) {
+        const dur = (message.durations || durationsRef.current || {})[message.lane] ?? message.remaining;
+        const clamped = Math.min(Math.max(message.remaining, 0), dur);
+        setRemaining(clamped);
+      }
       if (message.lights && message.phase) {
         setSignalStatus({
           state: message.lights,
           currentLane: message.lane,
           remainingTime: message.remaining,
-          phase: message.phase
+          phase: message.phase,
         });
       }
     };
@@ -127,14 +204,66 @@ const LaneDashboard = () => {
     };
   }, [token]);
 
-  const lanes = ['north', 'south', 'east', 'west'];
-  const currentLane = data.lane;
-  const remainingSeconds = data.remaining || 0;
-  const currentPhase = data.phase || 'red';
+  useEffect(() => {
+    durationsRef.current = durations;
+    if (activeLane) {
+      const dur = durations?.[activeLane] ?? 0;
+      setRemaining((prev) => Math.min(Math.max(prev, 0), dur));
+    }
+  }, [durations, activeLane]);
+
+  useEffect(() => {
+    activeLaneRef.current = activeLane;
+  }, [activeLane]);
+
+  const currentLane = activeLane;
+  const remainingSeconds = remaining || 0;
+  const currentPhase = activeLane ? data.phase || 'green' : 'red';
   const isOverride = data.override_active;
 
+  // Single ticker driving all timers
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setRemaining((prev) => {
+        const active = activeLaneRef.current;
+        const order = priorityOrderRef.current.length ? priorityOrderRef.current : lanes;
+        if (!active || !order.length) return 0;
+        const dur = durationsRef.current?.[active] ?? 0;
+        const clampedPrev = Math.min(Math.max(prev, 0), dur);
+
+        if (clampedPrev > 0) {
+          const nextVal = clampedPrev - 1;
+          const waits = calculateWaitingTimesPriorityRoundRobin(lanes, order, durationsRef.current, active, nextVal);
+          setWaitingTimes(waits);
+          return nextVal;
+        }
+
+        const activeIdx = order.indexOf(active);
+        const nextLane = activeIdx === -1 ? order[0] : order[(activeIdx + 1) % order.length];
+        const nextDur = durationsRef.current?.[nextLane] ?? 0;
+        const clampedNext = Math.min(Math.max(nextDur, 0), nextDur || 0);
+        activeLaneRef.current = nextLane;
+        setActiveLane(nextLane);
+        const waits = calculateWaitingTimesPriorityRoundRobin(lanes, order, durationsRef.current, nextLane, clampedNext);
+        setWaitingTimes(waits);
+        return clampedNext;
+      });
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [lanes]);
+
+  // recompute waiting times on tick or data change
+  useEffect(() => {
+    const computed = calculateWaitingTimesPriorityRoundRobin(lanes, priorityOrderRef.current, durations, currentLane, remainingSeconds);
+    setWaitingTimes(computed);
+  }, [lanes, durations, currentLane, remainingSeconds]);
+
   return (
-    <div className={`min-h-screen relative overflow-hidden ${isOverride ? 'bg-red-50' : 'bg-gradient-to-br from-amber-50 via-orange-50 to-yellow-50'}`}>
+    <div
+      className={`min-h-screen relative overflow-hidden ${
+        isOverride ? 'bg-red-50' : 'bg-gradient-to-br from-amber-50 via-orange-50 to-yellow-50'
+      }`}
+    >
       {/* Emergency Override Overlay */}
       {isOverride && (
         <div className="fixed inset-0 z-50 pointer-events-none flex items-center justify-center">
@@ -160,7 +289,7 @@ const LaneDashboard = () => {
       <Navbar />
       <div className="pt-28 px-6 max-w-7xl mx-auto pb-12 relative z-10">
         {/* Header Section */}
-        <motion.div 
+        <motion.div
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5 }}
@@ -177,27 +306,32 @@ const LaneDashboard = () => {
 
         {/* Signal Status Card */}
         {signalStatus && (
-          <motion.div 
+          <motion.div
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5, delay: 0.1 }}
             className="mb-8 backdrop-blur-sm bg-white/60 border border-white/50 rounded-3xl shadow-xl p-8 hover:shadow-2xl transition-all duration-300"
           >
-            <h2 className="text-3xl font-bold text-gray-900 mb-6 flex items-center gap-3 bg-gradient-to-r from-amber-600 to-orange-600 bg-clip-text text-transparent">
+            <h2 className="text-3xl font-bold mb-6 flex items-center gap-3 bg-gradient-to-r from-amber-600 to-orange-600 bg-clip-text text-transparent">
               <span className="text-3xl">📊</span>
               Signal Status
             </h2>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               {[
-                { label: 'Current Lane', value: signalStatus.currentLane || 'None', icon: '🛣️' },
-                { 
-                  label: 'Phase', 
+                { label: 'Current Lane', value: signalStatus.currentLane || 'None', icon: '🛣' },
+                {
+                  label: 'Phase',
                   value: signalStatus.phase?.toUpperCase() || 'RED',
-                  color: signalStatus.phase === 'green' ? 'text-emerald-600' : signalStatus.phase === 'yellow' ? 'text-amber-600' : 'text-red-600',
-                  icon: signalStatus.phase === 'green' ? '🟢' : signalStatus.phase === 'yellow' ? '🟡' : '🔴'
+                  color:
+                    signalStatus.phase === 'green'
+                      ? 'text-emerald-600'
+                      : signalStatus.phase === 'yellow'
+                      ? 'text-amber-600'
+                      : 'text-red-600',
+                  icon: signalStatus.phase === 'green' ? '🟢' : signalStatus.phase === 'yellow' ? '🟡' : '🔴',
                 },
-                { label: 'Remaining', value: `${signalStatus.remainingTime || 0}s`, icon: '⏱️' },
-                { label: 'Status', value: signalStatus.state ? 'Active' : 'Inactive', icon: '✅' }
+                { label: 'Remaining', value: `${signalStatus.remainingTime || 0}s`, icon: '⏱' },
+                { label: 'Status', value: signalStatus.state ? 'Active' : 'Inactive', icon: '✅' },
               ].map((item, idx) => (
                 <motion.div
                   key={idx}
@@ -208,9 +342,7 @@ const LaneDashboard = () => {
                     <span>{item.icon}</span>
                     {item.label}
                   </p>
-                  <p className={`text-xl font-bold text-gray-900 mt-2 ${item.color || ''} capitalize`}>
-                    {item.value}
-                  </p>
+                  <p className={`text-xl font-bold text-gray-900 mt-2 ${item.color || ''} capitalize`}>{item.value}</p>
                 </motion.div>
               ))}
             </div>
@@ -219,14 +351,14 @@ const LaneDashboard = () => {
 
         {/* Cycle Information Card */}
         {data.priority_order && (
-          <motion.div 
+          <motion.div
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5, delay: 0.2 }}
             className="mb-8 backdrop-blur-sm bg-white/60 border border-white/50 rounded-3xl shadow-xl p-8 hover:shadow-2xl transition-all duration-300"
           >
-            <h2 className="text-3xl font-bold text-gray-900 mb-6 flex items-center gap-3 bg-gradient-to-r from-amber-600 to-orange-600 bg-clip-text text-transparent">
-              <span className="text-3xl">⚙️</span>
+            <h2 className="text-3xl font-bold mb-6 flex items-center gap-3 bg-gradient-to-r from-amber-600 to-orange-600 bg-clip-text text-transparent">
+              <span className="text-3xl">⚙</span>
               Cycle Information
             </h2>
             <div className="space-y-4">
@@ -249,13 +381,15 @@ const LaneDashboard = () => {
                   <p className="text-sm text-gray-700 mb-3 font-semibold">Durations</p>
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                     {data.priority_order.map((lane) => (
-                      <motion.div 
+                      <motion.div
                         key={lane}
                         whileHover={{ scale: 1.05, y: -2 }}
                         className="bg-white/80 border border-amber-200/50 rounded-xl p-4 text-center hover:border-amber-400/50 transition-all shadow-sm hover:shadow-md"
                       >
                         <p className="text-xs text-gray-700 capitalize font-bold">{lane}</p>
-                        <p className="text-2xl font-bold bg-gradient-to-r from-amber-600 to-orange-600 bg-clip-text text-transparent mt-1">{data.durations[lane]}s</p>
+                        <p className="text-2xl font-bold bg-gradient-to-r from-amber-600 to-orange-600 bg-clip-text text-transparent mt-1">
+                          {data.durations[lane]}s
+                        </p>
                       </motion.div>
                     ))}
                   </div>
@@ -267,7 +401,7 @@ const LaneDashboard = () => {
 
         {/* Big Timer Display */}
         {currentPhase !== 'red' && remainingSeconds > 0 && (
-          <motion.div 
+          <motion.div
             initial={{ opacity: 0, scale: 0.9 }}
             animate={{ opacity: 1, scale: 1 }}
             transition={{ duration: 0.6, delay: 0.3 }}
@@ -275,27 +409,27 @@ const LaneDashboard = () => {
           >
             <div className="relative">
               {/* Animated background glow */}
-              <motion.div 
+              <motion.div
                 animate={{ scale: [1, 1.1, 1] }}
                 transition={{ duration: 2, repeat: Infinity }}
                 className="absolute inset-0 bg-gradient-to-br from-amber-400 to-orange-600 rounded-3xl blur-2xl opacity-50"
               />
-              
+
               {/* Main timer card */}
               <div className="relative bg-gradient-to-br from-amber-500 via-orange-500 to-yellow-500 rounded-3xl shadow-2xl p-12 border-4 border-white/40 backdrop-blur-sm">
-                <motion.div 
+                <motion.div
                   className="text-center"
                   animate={{ y: [0, -2, 0] }}
                   transition={{ duration: 2, repeat: Infinity }}
                 >
-                  <motion.div 
+                  <motion.div
                     animate={{ opacity: [0.8, 1, 0.8] }}
                     transition={{ duration: 1, repeat: Infinity }}
                     className="text-lg font-semibold text-white/90 mb-2 uppercase tracking-widest drop-shadow-lg"
                   >
                     {currentPhase === 'green' ? '🟢 Green Light' : '🟡 Yellow Light'}
                   </motion.div>
-                  <motion.div 
+                  <motion.div
                     key={remainingSeconds}
                     initial={{ scale: 1.2, opacity: 0 }}
                     animate={{ scale: 1, opacity: 1 }}
@@ -304,9 +438,7 @@ const LaneDashboard = () => {
                   >
                     {remainingSeconds}
                   </motion.div>
-                  <div className="text-xl font-semibold text-white/90 mt-4 capitalize drop-shadow-lg">
-                    {currentLane} Lane
-                  </div>
+                  <div className="text-xl font-semibold text-white/90 mt-4 capitalize drop-shadow-lg">{currentLane} Lane</div>
                 </motion.div>
               </div>
             </div>
@@ -314,7 +446,7 @@ const LaneDashboard = () => {
         )}
 
         {/* Lane Cards Grid */}
-        <motion.div 
+        <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ duration: 0.5, delay: 0.4 }}
@@ -327,10 +459,12 @@ const LaneDashboard = () => {
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.5, delay: 0.4 + idx * 0.1 }}
             >
-              <LaneCard 
-                lane={lane} 
+              <LaneCard
+                lane={lane}
                 data={data}
                 isActive={currentLane === lane && currentPhase !== 'red'}
+                remaining={currentLane === lane ? remainingSeconds : undefined}
+                waitTime={waitingTimes?.[lane] ?? 1}
               />
             </motion.div>
           ))}
