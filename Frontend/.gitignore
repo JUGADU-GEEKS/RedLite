@@ -24,3 +24,4 @@ dist-ssr
 *.sw?
 *mp4*
 !/public/Videos/wrongside.mp4
+!/public/Videos/5.mp4
