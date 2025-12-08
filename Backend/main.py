@@ -398,6 +398,14 @@ TO_NUMBER = os.getenv('TO_NUMBER')
 # Check if all required environment variables are present
 OMNIDIM_CONFIGURED = all([API_KEY, AGENT_ID, FROM_NUMBER_ID, TO_NUMBER])
 
+# Ensure Videos directory exists and mount it so frontend can request /Videos/<file>
+try:
+    os.makedirs(VIDEOS_DIR, exist_ok=True)
+    app.mount("/Videos", StaticFiles(directory=VIDEOS_DIR), name="videos")
+    logger.info(f"[VIDEOS] Mounted Videos directory from {VIDEOS_DIR}")
+except Exception as e:
+    logger.warning(f"[VIDEOS] Failed to mount Videos directory: {e}")
+
 if not OMNIDIM_CONFIGURED:
     print("[WARNING] Omnidim SDK not configured. Missing environment variables:")
     if not API_KEY:
