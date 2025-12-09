@@ -1,5 +1,6 @@
 import React, { useRef, useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
+import { useTranslation } from 'react-i18next';
 import {
   ArrowUp, ArrowDown, ArrowLeft, ArrowRight, Eye, X
 } from 'lucide-react';
@@ -134,15 +135,15 @@ function LaneCard({
         whileHover={{ scale: 1.05 }}
         whileTap={{ scale: 0.98 }}
       >
-        Change Manually
+        {t('pages:dashboard.changeManually')}
       </motion.button>
       {started && (
         <div className="flex flex-col gap-3 mt-4 items-start w-full">
           <div className="text-base text-gray-700 font-medium">
-            Total Vehicles: <span className="font-mono ml-1 text-amber-600 font-bold">{data?.total || 0}</span>
+            {t('pages:dashboard.totalVehicles')}: <span className="font-mono ml-1 text-amber-600 font-bold">{data?.total || 0}</span>
           </div>
           <div className="text-base text-gray-700 font-medium">
-            Last Green Time: <span className="font-mono ml-1 text-amber-600 font-bold">{lastGreenTime}</span>
+            {t('pages:dashboard.lastGreenTime')}: <span className="font-mono ml-1 text-amber-600 font-bold">{lastGreenTime}</span>
           </div>
         </div>
       )}
@@ -150,6 +151,7 @@ function LaneCard({
   );
 }
 function Dashboard({ onHowItWorksClick, onHomeClick, onDashboardClick, onMapClick, onTeamClick }) {
+  const { t } = useTranslation(['pages', 'common']);
   const navigate = useNavigate();
   const [videoData, setVideoData] = useState({});
   const [lights, setLights] = useState({});
@@ -495,7 +497,7 @@ function Dashboard({ onHowItWorksClick, onHomeClick, onDashboardClick, onMapClic
           transition={{ duration: 0.8 }}
         >
           <h1 className="text-6xl md:text-7xl font-bold mb-6 bg-gradient-to-r from-amber-600 via-orange-500 to-yellow-600 bg-clip-text text-transparent font-serif leading-tight">
-            Lanezy Dashboard
+            {t('pages:dashboard.title')}
           </h1>
           <div className="w-24 h-1 bg-gradient-to-r from-amber-500 to-orange-500 rounded-full mx-auto mb-8"></div>
           <motion.p
@@ -504,9 +506,9 @@ function Dashboard({ onHowItWorksClick, onHomeClick, onDashboardClick, onMapClic
             animate={{ opacity: 1 }}
             transition={{ delay: 0.4, duration: 0.8 }}
           >
-            Real-time vehicle detection and traffic flow analysis using{' '}
+            {t('pages:dashboard.description')}{' '}
             <span className="font-semibold bg-gradient-to-r from-amber-600 to-orange-600 bg-clip-text text-transparent">
-              advanced YOLO computer vision technology
+              {t('pages:dashboard.yoloTech')}
             </span>
           </motion.p>
 

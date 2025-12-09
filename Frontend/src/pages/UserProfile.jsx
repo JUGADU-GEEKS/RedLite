@@ -1,9 +1,11 @@
 import React, { useEffect, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { getAuthHeaders } from '../services/auth'
 import Navbar from '../components/Navbar'
 import { User as UserIcon } from 'lucide-react'
 
 export default function UserProfile(){
+  const { t } = useTranslation(['pages', 'common'])
   const [profile, setProfile] = useState(null)
   const [sos, setSos] = useState([])
   const [echallans, setEchallans] = useState([])
@@ -40,16 +42,16 @@ export default function UserProfile(){
     load()
   },[])
 
-  if (loading) return <div className="p-6">Loading...</div>
-  if (!profile) return <div className="p-6">Not authenticated or profile unavailable</div>
+  if (loading) return <div className="p-6">{t('common:loading')}</div>
+  if (!profile) return <div className="p-6">{t('common:notAuthenticated')}</div>
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-amber-50 via-orange-50 to-yellow-50 relative overflow-hidden">
       <Navbar />
       <div className="max-w-6xl mx-auto p-8">
         <div className="mb-6">
-          <h2 className="text-3xl font-extrabold">My Profile</h2>
-          <p className="text-sm text-gray-600">Manage your account information and view SOS & e-challan history.</p>
+          <h2 className="text-3xl font-extrabold">{t('pages:userProfile.title')}</h2>
+          <p className="text-sm text-gray-600">{t('pages:userProfile.manageAccount')}</p>
         </div>
 
         <div className="bg-white/70 backdrop-blur-sm rounded-2xl shadow-xl border border-gray-100 p-6">
@@ -63,11 +65,11 @@ export default function UserProfile(){
                   <div className="mt-4 text-center">
                     <div className="text-lg font-semibold">{profile.name}</div>
                     <div className="text-sm text-gray-600">{profile.email}</div>
-                    <div className="mt-2 text-sm text-gray-700">{profile.mobile || 'Not provided'}</div>
+                    <div className="mt-2 text-sm text-gray-700">{profile.mobile || t('pages:userProfile.notProvided')}</div>
                     <div className="mt-2 text-sm text-red-600 font-bold">
-                      Fault tolerance: {profile.fault_count || 0} / 3
+                      {t('pages:userProfile.faultTolerance')}: {profile.fault_count || 0} / 3
                       {profile.suspended && (
-                        <div className="text-red-700 font-bold mt-1">Account suspended due to repeated fake requests.</div>
+                        <div className="text-red-700 font-bold mt-1">{t('pages:userProfile.accountSuspended')}</div>
                       )}
                     </div>
                   </div>
@@ -78,30 +80,30 @@ export default function UserProfile(){
             <div className="lg:w-2/3">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="p-4 bg-white rounded-lg border">
-                  <h4 className="font-semibold mb-3">Contact Information</h4>
+                  <h4 className="font-semibold mb-3">{t('pages:userProfile.contactInformation')}</h4>
                   <div className="text-sm text-gray-700 space-y-2">
-                    <div><span className="font-medium">Phone:</span> {profile.mobile || 'Not provided'}</div>
-                    <div><span className="font-medium">Email:</span> {profile.email}</div>
+                    <div><span className="font-medium">{t('pages:userProfile.phone')}:</span> {profile.mobile || t('pages:userProfile.notProvided')}</div>
+                    <div><span className="font-medium">{t('pages:userProfile.email')}:</span> {profile.email}</div>
                   </div>
                 </div>
               </div>
 
               <div className="mt-6">
-                <h3 className="text-xl font-semibold mb-3">SOS History</h3>
+                <h3 className="text-xl font-semibold mb-3">{t('pages:userProfile.sosHistory')}</h3>
                 {sos.length === 0 ? (
-                  <div className="text-sm text-gray-500">No SOS records found.</div>
+                  <div className="text-sm text-gray-500">{t('pages:userProfile.noSosRecords')}</div>
                 ) : (
                   <ul className="space-y-3">
                     {sos.map(item => (
                       <li key={item.caseId} className="border p-3 rounded-md bg-gray-50">
                         <div className="flex justify-between">
                           <div>
-                            <div className="font-semibold">Case: {item.caseId}</div>
-                            <div className="text-sm text-gray-600">Time: {item.timestamp}</div>
+                            <div className="font-semibold">{t('pages:userProfile.case')}: {item.caseId}</div>
+                            <div className="text-sm text-gray-600">{t('pages:userProfile.time')}: {item.timestamp}</div>
                           </div>
                           <div className="text-sm">
-                            <div>Status: {item.status}</div>
-                            <div>Notified: {item.authorities ? item.authorities.length : (item.sms ? item.sms.length : 0)}</div>
+                            <div>{t('common:status')}: {item.status}</div>
+                            <div>{t('pages:userProfile.notified')}: {item.authorities ? item.authorities.length : (item.sms ? item.sms.length : 0)}</div>
                           </div>
                         </div>
                       </li>
@@ -111,19 +113,19 @@ export default function UserProfile(){
               </div>
 
               <div className="mt-6">
-                <h3 className="text-xl font-semibold mb-3">E-Challan History</h3>
+                <h3 className="text-xl font-semibold mb-3">{t('pages:userProfile.echallanHistory')}</h3>
                 {echallans.length === 0 ? (
-                  <div className="text-sm text-gray-500">No challans issued yet.</div>
+                  <div className="text-sm text-gray-500">{t('pages:userProfile.noChallans')}</div>
                 ) : (
                   <ul className="space-y-3">
                     {echallans.map(c => (
                       <li key={c.id} className="border p-3 rounded-md bg-gray-50">
                         <div className="flex justify-between">
                           <div>
-                            <div className="font-semibold">{c.title || 'Challan'}</div>
-                            <div className="text-sm text-gray-600">Issued: {c.issuedAt}</div>
+                            <div className="font-semibold">{c.title || t('pages:userProfile.challan')}</div>
+                            <div className="text-sm text-gray-600">{t('pages:userProfile.issued')}: {c.issuedAt}</div>
                           </div>
-                          <div className="text-sm">Status: {c.status}</div>
+                          <div className="text-sm">{t('common:status')}: {c.status}</div>
                         </div>
                       </li>
                     ))}

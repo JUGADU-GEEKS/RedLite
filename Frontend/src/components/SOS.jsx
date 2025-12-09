@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { motion } from 'framer-motion';
+import { useTranslation } from 'react-i18next';
 import { AlertTriangle, Phone, Shield, ArrowLeft } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import Navbar from './Navbar';
@@ -17,6 +18,7 @@ const FloatingElement = ({ children, delay = 0, duration = 3 }) => (
 );
 
 const SOS = () => {
+  const { t } = useTranslation(['pages', 'common']);
   const navigate = useNavigate();
   const [isActivated, setIsActivated] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -48,7 +50,7 @@ const SOS = () => {
     if (isActivated) return;
 
     setIsLoading(true);
-    setMessage('SOS alert triggered — notifying help...');
+    setMessage(t('pages:sos.alertTriggered'));
 
     try {
       // Resolve location: try live geolocation first, else fallback to captured coords
@@ -119,7 +121,7 @@ const SOS = () => {
         const caseId = body.caseId;
         const notifiedCount = (body.notified && body.notified.length) || (body.sms && body.sms.length) || 0;
         setIsActivated(true);
-        setMessage(`SOS sent — Case ID: ${caseId}. Notified ${notifiedCount} contacts.`);
+        setMessage(`${t('pages:sos.sosSent')} ${caseId}. ${t('pages:sos.notified')} ${notifiedCount} ${t('pages:sos.contacts')}`);
         playSirenSound();
 
         // Show detailed SMS results in console and a compact UI debug block
@@ -145,11 +147,11 @@ const SOS = () => {
           setIsActivated(false);
         }, 15000);
       } else {
-        setMessage(`❌ Failed to trigger SOS: ${body?.message || 'Unknown error'}`);
+        setMessage(`❌ ${t('pages:sos.failedToTrigger')} ${body?.message || t('common:error')}`);
       }
     } catch (err) {
       console.error('SOS activation error:', err);
-      setMessage('❌ Failed to trigger SOS. Please call emergency services directly.');
+      setMessage(`❌ ${t('pages:sos.failedToTrigger')} ${err.message || t('common:error')}`);
     } finally {
       setIsLoading(false);
     }
@@ -271,11 +273,11 @@ const SOS = () => {
               transition={{ delay: 0.4, duration: 0.8 }}
             >
               <span className="font-semibold bg-gradient-to-r from-red-600 to-orange-600 bg-clip-text text-transparent">
-                For Critical Use Only
+                {t('pages:sos.forCriticalUse')}
               </span>
               <br />
               <span className="text-lg text-gray-500 mt-2 block">
-                Use only in real roadside emergencies requiring urgent towing support.
+                {t('pages:sos.useOnly')}
               </span>
             </motion.p>
 
@@ -338,18 +340,17 @@ const SOS = () => {
                       transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
                     >
                       <div className="w-12 h-12 border-4 border-white/30 border-t-white rounded-full mb-4"></div>
-                      <span className="text-xl">SENDING...</span>
+                      <span className="text-xl">{t('pages:sos.activating')}</span>
                     </motion.div>
                   ) : isActivated ? (
                     <div className="flex flex-col items-center">
                       <Shield className="w-16 h-16 mb-4" />
-                      <span className="text-xl">SENT!</span>
-                      <span className="text-sm mt-2">Police Notified</span>
+                      <span className="text-xl">{t('pages:sos.sosActivated')}</span>
+                      <span className="text-sm mt-2">{t('pages:sos.helpOnWay')}</span>
                     </div>
                   ) : (
                     <div className="flex flex-col items-center">
-                      {/* <span className="text-5xl mb-2">SOS</span> */}
-                      <span className="text-m">EMERGENCY</span>
+                      <span className="text-m">{t('pages:sos.triggerSOS')}</span>
                     </div>
                   )}
                 </motion.button>

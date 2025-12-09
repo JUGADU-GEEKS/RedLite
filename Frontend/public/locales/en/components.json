@@ -1,0 +1,18 @@
+{
+  "laneCard": {
+    "remaining": "remaining",
+    "untilGreen": "until green",
+    "sRemaining": "s remaining",
+    "sUntilGreen": "s until green",
+    "rank": "Rank",
+    "noFrame": "No frame",
+    "vehicleCount": "Vehicle Count",
+    "age": "Age",
+    "greenDuration": "Green Duration",
+    "status": "Status"
+  },
+  "acknowledgement": {
+    "sosAcknowledged": "✔ Your SOS request has been acknowledged by authorities. Help is on the way."
+  }
+}
+

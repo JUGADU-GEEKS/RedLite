@@ -1,9 +1,11 @@
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 
 // README: Badge shows remaining time for active lane (green) or waiting time to
 // turn green for non-active lanes (red). Waiting time provided by parent; no
 // local computation here.
 const LaneCard = ({ lane, data, isActive = false, waitTime = 1, remaining = 0 }) => {
+  const { t } = useTranslation(['components', 'common']);
   const { counts, frames, lights, phase, ages, priority_order, durations } = data;
   const count = counts ? counts[lane] : 0;
   const frame = frames ? frames[lane] : '';
@@ -25,7 +27,9 @@ const LaneCard = ({ lane, data, isActive = false, waitTime = 1, remaining = 0 })
 
   const timerBg = isActive ? 'bg-green-600' : 'bg-red-600';
   const timerValue = isActive ? Math.max(0, remaining ?? 0) : Math.max(1, waitTime ?? 1);
-  const timerLabel = isActive ? `${timerValue}s remaining` : `${timerValue}s until green`;
+  const timerLabel = isActive 
+    ? `${timerValue}${t('components:laneCard.sRemaining')}` 
+    : `${timerValue}${t('components:laneCard.sUntilGreen')}`;
   const statusRemaining = isActive ? timerValue : remaining ?? 0;
 
   // Highlight active lane
@@ -47,7 +51,7 @@ const LaneCard = ({ lane, data, isActive = false, waitTime = 1, remaining = 0 })
             <div className={`w-5 h-5 rounded-full ${lightColor} ${lightGlow} transition-all`}></div>
             {rank && (
               <span className="px-2 py-1 bg-gray-100 text-gray-700 text-xs font-semibold rounded">
-                Rank {rank}
+                {t('components:laneCard.rank')} {rank}
               </span>
             )}
           </div>
@@ -60,30 +64,30 @@ const LaneCard = ({ lane, data, isActive = false, waitTime = 1, remaining = 0 })
           </div>
         ) : (
           <div className="mb-3 h-32 bg-gray-100 rounded-lg flex items-center justify-center">
-            <span className="text-gray-400 text-sm">No frame</span>
+            <span className="text-gray-400 text-sm">{t('components:laneCard.noFrame')}</span>
           </div>
         )}
 
         {/* Stats */}
         <div className="space-y-2">
           <div className="flex justify-between items-center">
-            <span className="text-sm text-gray-600">Vehicle Count:</span>
+            <span className="text-sm text-gray-600">{t('components:laneCard.vehicleCount')}:</span>
             <span className="font-bold text-gray-900">{count}</span>
           </div>
           <div className="flex justify-between items-center">
-            <span className="text-sm text-gray-600">Age:</span>
+            <span className="text-sm text-gray-600">{t('components:laneCard.age')}:</span>
             <span className={`font-bold ${age > 60 ? 'text-red-600' : 'text-gray-900'}`}>{age}s</span>
           </div>
           {duration && (
             <div className="flex justify-between items-center">
-              <span className="text-sm text-gray-600">Green Duration:</span>
+              <span className="text-sm text-gray-600">{t('components:laneCard.greenDuration')}:</span>
               <span className="font-bold text-gray-900">{duration}s</span>
             </div>
           )}
           {isActive && phase && (
             <div className="mt-3 pt-3 border-t border-gray-200">
               <div className="flex justify-between items-center">
-                <span className="text-sm font-medium text-gray-700">Status:</span>
+                <span className="text-sm font-medium text-gray-700">{t('common:status')}:</span>
                 <span
                   className={`px-3 py-1 rounded-full text-xs font-semibold ${
                     phase === 'green'
@@ -101,7 +105,7 @@ const LaneCard = ({ lane, data, isActive = false, waitTime = 1, remaining = 0 })
                   <span className={`text-2xl font-bold ${isGreen ? 'text-green-600' : isYellow ? 'text-yellow-600' : 'text-red-600'}`}>
                     {statusRemaining}s
                   </span>
-                  <span className="text-xs text-gray-500 ml-1">remaining</span>
+                  <span className="text-xs text-gray-500 ml-1">{t('components:laneCard.remaining')}</span>
                 </div>
               )}
             </div>
