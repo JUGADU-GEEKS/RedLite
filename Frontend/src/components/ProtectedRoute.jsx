@@ -1,5 +1,5 @@
 import React from 'react';
-import { Navigate } from 'react-router-dom';
+import { Navigate, useParams, useLocation } from 'react-router-dom';
 
 function getAuth() {
   const token = localStorage.getItem('lanezy_token');
@@ -8,8 +8,21 @@ function getAuth() {
 }
 
 export default function ProtectedRoute({ children, roles }) {
+  const { lang } = useParams();
+  const location = useLocation();
   const { token, user } = getAuth();
-  if (!token || !user) return <Navigate to="/login" replace />;
-  if (roles && !roles.includes(user.role)) return <Navigate to="/unauthorized" replace />;
+  
+  // Extract language from URL or default to 'en'
+  const currentLang = lang || 'en';
+  
+  // Preserve language prefix in redirects
+  if (!token || !user) {
+    return <Navigate to={`/${currentLang}/login`} replace state={{ from: location }} />;
+  }
+  
+  if (roles && !roles.includes(user.role)) {
+    return <Navigate to={`/${currentLang}/unauthorized`} replace />;
+  }
+  
   return children;
 }

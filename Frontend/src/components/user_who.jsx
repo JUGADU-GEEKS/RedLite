@@ -1,6 +1,7 @@
 import React from 'react';
 import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { User, Shield, ShieldCheck, Ambulance } from 'lucide-react';
 
 // Floating elements for background decoration (same as landing page)
@@ -23,22 +24,34 @@ const FloatingElement = ({ children, delay = 0, duration = 3 }) => (
 
 function UserWho() {
   const navigate = useNavigate();
+  const { t } = useTranslation(['pages', 'common']);
+  
+  // Get current language from URL
+  const getCurrentLang = () => {
+    const path = window.location.pathname;
+    const langMatch = path.match(/^\/(en|hi|od)/);
+    return langMatch ? langMatch[1] : 'en';
+  };
 
   const handleCivilianClick = () => {
+    const currentLang = getCurrentLang();
     // Send the intended post-login redirect so UserAuth can forward the user
-    navigate('/user-login', { state: { redirectTo: '/home' } });
+    navigate(`/${currentLang}/user-login`, { state: { redirectTo: `/${currentLang}/home` } });
   };
 
   const handleTrafficOfficerClick = () => {
-    navigate('/login');
+    const currentLang = getCurrentLang();
+    navigate(`/${currentLang}/login`);
   };
 
   const handleAdminClick = () => {
-    navigate('/login');
+    const currentLang = getCurrentLang();
+    navigate(`/${currentLang}/login`);
   };
 
   const handleAmbulanceDriverClick = () => {
-    navigate('/login');
+    const currentLang = getCurrentLang();
+    navigate(`/${currentLang}/login`);
   };
 
   return (
@@ -79,11 +92,11 @@ function UserWho() {
             transition={{ duration: 0.8 }}
           >
             <h1 className="text-6xl md:text-7xl font-bold mb-6 bg-gradient-to-r from-amber-600 via-orange-500 to-yellow-600 bg-clip-text text-transparent font-serif leading-tight">
-              Welcome
+              {t('pages:userWho.title')}
             </h1>
             <div className="w-24 h-1 bg-gradient-to-r from-amber-500 to-orange-500 rounded-full mx-auto mb-8"></div>
             <p className="text-xl text-gray-600 leading-relaxed">
-              to <span className="font-semibold bg-gradient-to-r from-amber-600 to-orange-600 bg-clip-text text-transparent">Lanezy</span> Traffic Management System
+              {t('pages:userWho.toLanezy')}
             </p>
           </motion.div>
 
@@ -95,7 +108,7 @@ function UserWho() {
             transition={{ delay: 0.3, duration: 0.8 }}
           >
             <h2 className="text-3xl font-bold text-center mb-8 bg-gradient-to-r from-gray-700 to-gray-900 bg-clip-text text-transparent">
-              You're a
+              {t('pages:userWho.youreA')}
             </h2>
 
             <div className="space-y-5">
@@ -111,7 +124,7 @@ function UserWho() {
               >
                 <div className="flex items-center justify-center space-x-3">
                   <User className="w-5 h-5" />
-                  <span className="text-lg">Civilian</span>
+                  <span className="text-lg">{t('pages:userWho.civilian')}</span>
                   <motion.span
                     className="group-hover:translate-x-1 transition-transform duration-300"
                   >
@@ -119,7 +132,7 @@ function UserWho() {
                   </motion.span>
                 </div>
                 <p className="text-xs text-yellow-100 mt-1.5 opacity-90">
-                  Access traffic updates and report issues
+                  {t('pages:userWho.civilianDesc')}
                 </p>
               </motion.button>
 
@@ -135,7 +148,7 @@ function UserWho() {
               >
                 <div className="flex items-center justify-center space-x-3">
                   <Shield className="w-5 h-5" />
-                  <span className="text-lg">Traffic Officer</span>
+                  <span className="text-lg">{t('pages:userWho.trafficOfficer')}</span>
                   <motion.span
                     className="group-hover:translate-x-1 transition-transform duration-300"
                   >
@@ -143,7 +156,7 @@ function UserWho() {
                   </motion.span>
                 </div>
                 <p className="text-xs text-orange-100 mt-1.5 opacity-90">
-                  Manage traffic systems and controls
+                  {t('pages:userWho.officerDesc')}
                 </p>
               </motion.button>
 
@@ -159,7 +172,7 @@ function UserWho() {
               >
                 <div className="flex items-center justify-center space-x-3">
                   <ShieldCheck className="w-5 h-5" />
-                  <span className="text-lg">Admin</span>
+                  <span className="text-lg">{t('pages:userWho.admin')}</span>
                   <motion.span
                     className="group-hover:translate-x-1 transition-transform duration-300"
                   >
@@ -167,7 +180,7 @@ function UserWho() {
                   </motion.span>
                 </div>
                 <p className="text-xs text-purple-100 mt-1.5 opacity-90">
-                  Full system administration and oversight
+                  {t('pages:userWho.adminDesc')}
                 </p>
               </motion.button>
 
@@ -183,7 +196,7 @@ function UserWho() {
               >
                 <div className="flex items-center justify-center space-x-3">
                   <Ambulance className="w-5 h-5" />
-                  <span className="text-lg">Ambulance Driver</span>
+                  <span className="text-lg">{t('pages:userWho.ambulanceDriver')}</span>
                   <motion.span
                     className="group-hover:translate-x-1 transition-transform duration-300"
                   >
@@ -191,7 +204,7 @@ function UserWho() {
                   </motion.span>
                 </div>
                 <p className="text-xs text-red-100 mt-1.5 opacity-90">
-                  Emergency response and priority routing
+                  {t('pages:userWho.ambulanceDesc')}
                 </p>
               </motion.button>
             </div>
@@ -205,7 +218,7 @@ function UserWho() {
             transition={{ delay: 0.9, duration: 0.8 }}
           >
             <p className="text-gray-500 text-sm">
-              Select your role to continue with the appropriate interface
+              {t('pages:userWho.selectRole')}
             </p>
           </motion.div>
         </div>

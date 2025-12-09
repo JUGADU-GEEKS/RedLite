@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
+import { useTranslation } from 'react-i18next';
 import Navbar from './Navbar';
 import Dashboard from './Dashboard';
 import HowItWorks from './HowItWorks';
@@ -80,6 +81,7 @@ const FloatingElement = ({ children, delay = 0, duration = 3 }) => (
 );
 
 const Landing = () => {
+  const { t } = useTranslation(['pages', 'common']);
   const [showHowItWorks, setShowHowItWorks] = useState(false);
   const [showDashboard, setShowDashboard] = useState(false);
   const [showMap, setShowMap] = useState(false);
@@ -88,6 +90,13 @@ const Landing = () => {
   const [pollingActive, setPollingActive] = useState(false);
 
   const navigate = useNavigate();
+  
+  // Get current language from URL for navigation
+  const getCurrentLang = () => {
+    const path = window.location.pathname;
+    const langMatch = path.match(/^\/(en|hi|od)/);
+    return langMatch ? langMatch[1] : 'en';
+  };
 
   // Poll for acknowledgements for cases created by this user (stored in localStorage by SOS.jsx)
   useEffect(() => {
@@ -111,7 +120,7 @@ const Landing = () => {
               const jd = await r.json();
               if (jd.status === 'success' && jd.recordStatus === 'Acknowledged') {
                 // Show popup to this citizen
-                setAckPopup({ visible: true, message: '✔ Your SOS request has been acknowledged by authorities. Help is on the way.' });
+                setAckPopup({ visible: true, message: t('components:acknowledgement.sosAcknowledged') });
                 // Remove this case from stored list
                 const remaining = stored.filter(x => x.caseId !== c.caseId);
                 localStorage.setItem('lanezy_sos_cases', JSON.stringify(remaining));
@@ -187,7 +196,7 @@ const Landing = () => {
                   transition={{ duration: 0.8 }}
                 >
                   <h1 className="text-7xl md:text-8xl font-bold mb-6 bg-gradient-to-r from-amber-600 via-orange-500 to-yellow-600 bg-clip-text text-transparent font-serif leading-tight">
-                    Lanezy
+                    {t('common:appName')}
                   </h1>
                   <div className="w-24 h-1 bg-gradient-to-r from-amber-500 to-orange-500 rounded-full mx-auto md:mx-0 mb-8"></div>
                 </motion.div>
@@ -198,11 +207,11 @@ const Landing = () => {
                   animate={{ opacity: 1 }}
                   transition={{ delay: 0.4, duration: 0.8 }}
                 >
-                  Revolutionizing traffic management with{' '}
+                  {t('pages:landing.tagline')}{' '}
                   <span className="font-semibold bg-gradient-to-r from-amber-600 to-orange-600 bg-clip-text text-transparent">
-                    AI-powered vehicle detection
+                    {t('pages:landing.aiDetection')}
                   </span>{' '}
-                  and intelligent flow optimization
+                  {t('pages:landing.optimization')}
                 </motion.p>
 
                 <motion.div
@@ -215,10 +224,13 @@ const Landing = () => {
                     className="group px-10 py-5 rounded-2xl bg-gradient-to-r from-amber-500 via-orange-500 to-yellow-500 text-white font-semibold shadow-2xl shadow-orange-500/25 hover:shadow-orange-500/40 transition-all duration-300 border border-white/20"
                     whileHover={{ scale: 1.05, y: -3 }}
                     whileTap={{ scale: 0.98 }}
-                    onClick={() => navigate('/dashboard')}
+                    onClick={() => {
+                      const currentLang = getCurrentLang();
+                      navigate(`/${currentLang}/dashboard`);
+                    }}
                   >
                     <span className="flex items-center space-x-2 cursor-pointer">
-                      <span>Get Started</span>
+                      <span>{t('pages:landing.getStarted')}</span>
                       <motion.span
                         className="group-hover:translate-x-1 transition-transform duration-300"
                       >
@@ -231,10 +243,13 @@ const Landing = () => {
                     className="px-10 py-5 rounded-2xl bg-white/80 backdrop-blur-sm text-gray-700 font-semibold shadow-xl hover:shadow-2xl transition-all duration-300 border border-gray-200/50 hover:bg-white/90"
                     whileHover={{ scale: 1.05, y: -3 }}
                     whileTap={{ scale: 0.98 }}
-                    onClick={() => navigate('/team')}
+                    onClick={() => {
+                      const currentLang = getCurrentLang();
+                      navigate(`/${currentLang}/team`);
+                    }}
                   >
                     <span className="flex items-center space-x-2 cursor-pointer">
-                      <span>Our Team</span>
+                      <span>{t('pages:landing.ourTeam')}</span>
                       <motion.span
                         className="group-hover:translate-x-1 transition-transform duration-300"
                       >
@@ -300,7 +315,7 @@ const Landing = () => {
                   animate={{ opacity: 1 }}
                   transition={{ delay: 1.2 }}
                 >
-                  Lane 1
+                  {t('pages:landing.lane1')}
                 </motion.p>
               </div>
 
@@ -312,7 +327,7 @@ const Landing = () => {
                   animate={{ opacity: 1 }}
                   transition={{ delay: 1.4 }}
                 >
-                  Lane 2
+                  {t('pages:landing.lane2')}
                 </motion.p>
               </div>
 
@@ -324,7 +339,7 @@ const Landing = () => {
                   animate={{ opacity: 1 }}
                   transition={{ delay: 1.6 }}
                 >
-                  Lane 3
+                  {t('pages:landing.lane3')}
                 </motion.p>
               </div>
 
@@ -336,7 +351,7 @@ const Landing = () => {
                   animate={{ opacity: 1 }}
                   transition={{ delay: 1.6 }}
                 >
-                  Lane 4
+                  {t('pages:landing.lane4')}
                 </motion.p>
               </div>
             </div>
@@ -348,7 +363,7 @@ const Landing = () => {
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 1.8, duration: 0.8 }}
             >
-              Real-time adaptive control for optimal traffic flow
+              {t('pages:landing.realTimeControl')}
             </motion.p>
           </motion.div>
         </>
@@ -363,7 +378,7 @@ const Landing = () => {
               <div className="text-sm text-gray-900">{ackPopup.message}</div>
             </div>
             <div className="mt-2 text-right">
-              <button className="px-3 py-1 text-sm text-gray-600" onClick={() => setAckPopup({ visible: false, message: '' })}>Dismiss</button>
+              <button className="px-3 py-1 text-sm text-gray-600" onClick={() => setAckPopup({ visible: false, message: '' })}>{t('common:dismiss')}</button>
             </div>
           </div>
         </div>
