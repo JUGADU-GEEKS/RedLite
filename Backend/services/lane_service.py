@@ -1,6 +1,6 @@
 import asyncio
 import logging
-from typing import Dict, List
+from typing import Dict, List, Optional
 from fastapi import WebSocket
 
 from core.config import DEFAULT_INTERSECTION_ID, LANES, YELLOW_TIME
@@ -78,33 +78,77 @@ class PersistenceManager:
 
 class WebSocketManager:
     def __init__(self):
-        self.active_connections: List[WebSocket] = []
+        self._by_intersection: Dict[str, List[WebSocket]] = {}
+        self._conn_to_intersection: Dict[WebSocket, str] = {}
 
-    async def connect(self, websocket: WebSocket):
+    async def connect(self, websocket: WebSocket, intersection_id: str):
         await websocket.accept()
-        self.active_connections.append(websocket)
+        self._by_intersection.setdefault(intersection_id, []).append(websocket)
+        self._conn_to_intersection[websocket] = intersection_id
 
-    def disconnect(self, websocket: WebSocket):
-        self.active_connections.remove(websocket)
+    def disconnect(self, websocket: WebSocket) -> Optional[str]:
+        iid = self._conn_to_intersection.pop(websocket, None)
+        if iid and iid in self._by_intersection:
+            try:
+                self._by_intersection[iid].remove(websocket)
+            except ValueError:
+                pass
+            if not self._by_intersection[iid]:
+                del self._by_intersection[iid]
+        return iid
 
-    async def broadcast(self, payload: dict):
-        for connection in self.active_connections:
-            await connection.send_json(payload)
+    def has_subscribers(self, intersection_id: str) -> bool:
+        return bool(self._by_intersection.get(intersection_id))
+
+    async def broadcast(self, payload: dict, intersection_id: str):
+        conns = list(self._by_intersection.get(intersection_id, []))
+        for connection in conns:
+            try:
+                await connection.send_json(payload)
+            except Exception:
+                # Best-effort; drop bad connections silently
+                try:
+                    self.disconnect(connection)
+                except Exception:
+                    pass
 
 
 from services import emergency_service
 
 class LaneService:
     def __init__(self, mongo_url: str):
-        self.detector = VideoYOLODetector(DEFAULT_INTERSECTION_ID)
+        self._detectors: Dict[str, VideoYOLODetector] = {}
         self.ages = {lane: 0 for lane in LANES}
         self.persistence = PersistenceManager(mongo_url)
         self.ws_manager = WebSocketManager()
         self.stop_event = asyncio.Event()
-        self.current_state = {}
+        self.current_state_by_intersection: Dict[str, dict] = {}
+        self._tasks: Dict[str, asyncio.Task] = {}
+
+    def _get_detector(self, intersection_id: str) -> VideoYOLODetector:
+        det = self._detectors.get(intersection_id)
+        if det is None:
+            det = VideoYOLODetector(intersection_id)
+            self._detectors[intersection_id] = det
+        return det
+
+    async def ensure_loop(self, intersection_id: str):
+        if intersection_id in self._tasks and not self._tasks[intersection_id].done():
+            return
+        self._tasks[intersection_id] = asyncio.create_task(self._run_loop_for(intersection_id))
+
+    def maybe_stop_loop(self, intersection_id: str):
+        if not self.ws_manager.has_subscribers(intersection_id):
+            task = self._tasks.pop(intersection_id, None)
+            if task and not task.done():
+                task.cancel()
+            det = self._detectors.pop(intersection_id, None)
+            if det:
+                det.release()
 
     async def run_cycle_plan(self, intersectionId: str):
-        counts, frames = self.detector.get_cycle_snapshot()
+        detector = self._get_detector(intersectionId)
+        counts, frames = detector.get_cycle_snapshot()
         ages_snapshot = self.ages.copy()
         
         state = prr_cycle_fixed(counts, ages_snapshot)
@@ -112,7 +156,7 @@ class LaneService:
         traffic_data = TrafficData(
             intersectionId=intersectionId,
             lane_counts=counts,
-            source="yolo" if self.detector.model else "fallback",
+            source="yolo" if (getattr(detector, "model", None)) else "fallback",
             priority_order=state["priority_order"],
             durations=state["durations"],
             ages=ages_snapshot,
@@ -128,49 +172,32 @@ class LaneService:
         )
         await self.persistence.upsert_signal_state(initial_signal_state)
         
-        self.current_state = {
+        self.current_state_by_intersection[intersectionId] = {
             "counts": counts,
             "frames": frames,
             **state
         }
-        return self.current_state
+        return self.current_state_by_intersection[intersectionId]
 
-    async def background_loop(self):
-        """
-        Main cycle loop implementing PRR-MASC fixed cycle logic:
-        - Priority computed ONCE per full cycle (all 4 lanes)
-        - Fixed timings: Rank 1=45s, Rank 2=30s, Rank 3=15s, Rank 4=15s, Yellow=3s
-        - Density snapshot captured once at start, used for entire cycle
-        - Ages reset to 0 for ALL lanes after each full cycle completes
-        """
+    async def _run_loop_for(self, intersection_id: str):
         while not self.stop_event.is_set():
             try:
-                # Check for Emergency Override at the start of the cycle or loop
-                # We need to check frequently, not just at cycle start.
-                # So we will check inside the lane loops.
-                
-                # STEP 1: Compute priority ONCE at cycle start
-                # Capture density snapshot and current ages
-                cycle_plan = await self.run_cycle_plan(DEFAULT_INTERSECTION_ID)
+                cycle_plan = await self.run_cycle_plan(intersection_id)
                 priority_order = cycle_plan["priority_order"]
                 durations = cycle_plan["durations"]
-                counts_snapshot = cycle_plan["counts"]  # Frozen snapshot for entire cycle
-                ages_snapshot = self.ages.copy()  # Snapshot at cycle start
-                frames_snapshot = cycle_plan["frames"]  # Initial frames
+                counts_snapshot = cycle_plan["counts"]
+                ages_snapshot = self.ages.copy()
 
-                logger.info(f"[CYCLE START] Priority order: {priority_order}, Durations: {durations}, Ages: {ages_snapshot}")
+                logger.info(f"[CYCLE START {intersection_id}] Priority: {priority_order}, Durations: {durations}")
 
-                # STEP 2: Serve each lane in priority order (FIXED CYCLE)
                 for lane in priority_order:
                     green_duration = durations[lane]
-                    
-                    # GREEN PHASE - Fixed duration based on rank
                     for remaining in range(green_duration, 0, -1):
                         # --- EMERGENCY OVERRIDE CHECK ---
                         active_override = None
                         # Check known intersection IDs (or ideally use DEFAULT_INTERSECTION_ID if it matches)
                         # Assuming DEFAULT_INTERSECTION_ID is what we are controlling
-                        override = emergency_service.get_active_override(DEFAULT_INTERSECTION_ID)
+                        override = emergency_service.get_active_override(intersection_id)
                         if not override:
                              # Fallback check for demo IDs if DEFAULT_INTERSECTION_ID is generic
                              for i_id in ["INT-01", "INT-02", "INT-03"]:
@@ -186,7 +213,7 @@ class LaneService:
                             # Force override state
                             current_frames = {}
                             for l in LANES:
-                                frame = self.detector.read_frame(l)
+                                frame = self._get_detector(intersection_id).read_frame(l)
                                 current_frames[l] = frame if frame else ""
                             
                             light_state = {l: "green" if l == override_direction else "red" for l in LANES}
@@ -204,7 +231,7 @@ class LaneService:
                                 "override_active": True,
                                 "override_direction": override_direction
                             }
-                            await self.ws_manager.broadcast(payload)
+                            await self.ws_manager.broadcast(payload, intersection_id)
                             await asyncio.sleep(0.5)
                             continue # Skip normal logic and stay in this loop iteration (effectively pausing the countdown)
                             # Actually, 'continue' here just goes to next iteration of 'remaining' loop
@@ -213,7 +240,7 @@ class LaneService:
                             
                             while True:
                                 # Re-check override
-                                override = emergency_service.get_active_override(DEFAULT_INTERSECTION_ID)
+                                override = emergency_service.get_active_override(intersection_id)
                                 if not override:
                                      for i_id in ["INT-01", "INT-02", "INT-03"]:
                                          ov = emergency_service.get_active_override(i_id)
@@ -229,7 +256,7 @@ class LaneService:
                                 override_direction = override['direction'].lower()
                                 current_frames = {}
                                 for l in LANES:
-                                    frame = self.detector.read_frame(l)
+                                    frame = self._get_detector(intersection_id).read_frame(l)
                                     current_frames[l] = frame if frame else ""
                                 
                                 light_state = {l: "green" if l == override_direction else "red" for l in LANES}
@@ -246,7 +273,7 @@ class LaneService:
                                     "override_active": True,
                                     "override_direction": override_direction
                                 }
-                                await self.ws_manager.broadcast(payload)
+                                await self.ws_manager.broadcast(payload, intersection_id)
                                 await asyncio.sleep(0.5)
                             
                             # When loop breaks, we resume. 
@@ -258,7 +285,7 @@ class LaneService:
                         # Continuously read frames for all lanes during green
                         current_frames = {}
                         for l in LANES:
-                            frame = self.detector.read_frame(l)
+                            frame = self._get_detector(intersection_id).read_frame(l)
                             current_frames[l] = frame if frame else ""  # Ensure all lanes have entries
                         
                         light_state = {l: "red" for l in LANES}
@@ -275,17 +302,18 @@ class LaneService:
                             "ages": ages_snapshot,  # Use frozen snapshot
                             "lights": light_state
                         }
-                        await self.ws_manager.broadcast(payload)
+                        await self.ws_manager.broadcast(payload, intersection_id)
                         
                         signal_state = TrafficSignalState(
-                            intersectionId=DEFAULT_INTERSECTION_ID,
+                            intersectionId=intersection_id,
                             state=light_state,
                             currentLane=lane,
                             remainingTime=remaining,
                             phase="green"
                         )
                         await self.persistence.upsert_signal_state(signal_state)
-                        self.current_state.update(payload)
+                        cs = self.current_state_by_intersection.setdefault(intersection_id, {})
+                        cs.update(payload)
                         await asyncio.sleep(1)
 
                     # YELLOW PHASE - Fixed 3 seconds
@@ -293,7 +321,7 @@ class LaneService:
                         # Continuously read frames for all lanes during yellow
                         current_frames = {}
                         for l in LANES:
-                            frame = self.detector.read_frame(l)
+                            frame = self._get_detector(intersection_id).read_frame(l)
                             current_frames[l] = frame if frame else ""  # Ensure all lanes have entries
                         
                         light_state = {l: "red" for l in LANES}
@@ -310,24 +338,25 @@ class LaneService:
                             "ages": ages_snapshot,  # Use frozen snapshot
                             "lights": light_state
                         }
-                        await self.ws_manager.broadcast(payload)
+                        await self.ws_manager.broadcast(payload, intersection_id)
 
                         signal_state = TrafficSignalState(
-                            intersectionId=DEFAULT_INTERSECTION_ID,
+                            intersectionId=intersection_id,
                             state=light_state,
                             currentLane=lane,
                             remainingTime=remaining,
                             phase="yellow"
                         )
                         await self.persistence.upsert_signal_state(signal_state)
-                        self.current_state.update(payload)
+                        cs = self.current_state_by_intersection.setdefault(intersection_id, {})
+                        cs.update(payload)
                         await asyncio.sleep(1)
 
                     # Set lane to RED before moving to next lane
                     # Read frames for all lanes
                     current_frames = {}
                     for l in LANES:
-                        frame = self.detector.read_frame(l)
+                        frame = self._get_detector(intersection_id).read_frame(l)
                         current_frames[l] = frame if frame else ""  # Ensure all lanes have entries
                     
                     light_state = {l: "red" for l in LANES}
@@ -342,14 +371,14 @@ class LaneService:
                         "ages": ages_snapshot,
                         "lights": light_state
                     }
-                    await self.ws_manager.broadcast(payload)
+                    await self.ws_manager.broadcast(payload, intersection_id)
 
                 # STEP 3: After ALL 4 lanes complete, reset ages and prepare for next cycle
                 # Reset ALL ages to 0 (all lanes were served in round-robin)
                 for lane in LANES:
                     self.ages[lane] = 0
                 
-                logger.info(f"[CYCLE COMPLETE] All lanes served. Ages reset. Next cycle will recalculate priority.")
+                logger.info(f"[CYCLE COMPLETE {intersection_id}] Ages reset. Next cycle will recalc priority.")
 
             except asyncio.CancelledError:
                 logger.info("Background loop cancelled.")
@@ -357,6 +386,12 @@ class LaneService:
             except Exception as e:
                 logger.error(f"Error in background loop: {e}", exc_info=True)
                 await asyncio.sleep(5) # Wait before retrying
+
+    async def background_loop(self):
+        # Keep service alive; start default loop lazily for default intersection
+        await self.ensure_loop(DEFAULT_INTERSECTION_ID)
+        while not self.stop_event.is_set():
+            await asyncio.sleep(1)
 
     async def manual_trigger(self, intersectionId: str, requested_lane: str = None):
         """
@@ -379,7 +414,8 @@ class LaneService:
             return await self.run_cycle_plan(intersectionId)
 
     def release(self):
-        self.detector.release()
+        for det in self._detectors.values():
+            det.release()
         self.stop_event.set()
         logger.info("LaneService released resources.")
 

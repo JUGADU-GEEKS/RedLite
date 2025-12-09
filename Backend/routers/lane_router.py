@@ -70,7 +70,7 @@ async def get_signal_status(
         })
 
     # Merge in-memory information (durations, priority_order, ages, counts, live remaining/phase if present)
-    cs = lane_service.current_state or {}
+    cs = lane_service.current_state_by_intersection.get(intersectionId) or {}
     # current_state may store timings under different keys depending on where it was set
     # prefer live values from current_state when available
     response.setdefault("intersectionId", cs.get("intersectionId", intersectionId))
@@ -126,6 +126,4 @@ async def get_current_state(
     user: User = Depends(require_role(["employee", "admin"])),
     lane_service: LaneService = Depends(get_lane_service)
 ):
-    if lane_service.current_state.get("intersectionId") == intersectionId:
-        return lane_service.current_state
-    return {}
+    return lane_service.current_state_by_intersection.get(intersectionId, {})
