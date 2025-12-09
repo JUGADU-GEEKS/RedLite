@@ -2387,5 +2387,41 @@
     ],
     "ack_time": "2025-12-09 10:36:54",
     "ack_by": "authority"
+  },
+  {
+    "caseId": "7e39bdafa0d146e4aa9e5b005127d0cc",
+    "timestamp": "2025-12-09 17:27:27",
+    "userId": "USER-0E0D0B83",
+    "userName": "xyzw",
+    "phone": "+919910974301",
+    "vehicle": "not provided",
+    "latitude": 22.2312649,
+    "longitude": 84.8385466,
+    "status": "Reported",
+    "authorities": [
+      {
+        "name": "Forced Target",
+        "phone": "+917703928478",
+        "lat": null,
+        "lng": null,
+        "distance_km": null
+      }
+    ],
+    "sms": [
+      {
+        "name": "Forced Target",
+        "phone": "+917703928478",
+        "status": "sent",
+        "sid": "SM6deb284de2b6dabed6f658a0c504b6ca"
+      },
+      {
+        "name": "Secondary Verified",
+        "phone": "+919910974301",
+        "status": "sent",
+        "sid": "SMae2fe844194b320c1f56d5db9f04e099"
+      }
+    ],
+    "ack_time": "2025-12-09 17:28:07",
+    "ack_by": "authority"
   }
 ]

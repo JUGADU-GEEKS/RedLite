@@ -1,3 +1,31 @@
+@router.post("/report_tow")
+async def report_tow(body: dict, db=Depends(get_db)):
+    """
+    Admin reports a tow service incident. Sends e-challan SMS to +917703928478.
+    Expects: { caseId: str, userName: str, vehicle: str, violation: str }
+    """
+    case_id = body.get("caseId")
+    user_name = body.get("userName", "Unknown")
+    vehicle = body.get("vehicle", "Unknown")
+    violation = body.get("violation", "Tow Violation")
+    sms_result = None
+    try:
+        from services.ack_service import _init_twilio_client
+        client, twilio_from, twilio_send_enabled = await _init_twilio_client()
+        tow_number = "+917703928478"
+        if client and twilio_from and tow_number:
+            challan_msg = f"LANEZY E-CHALLAN:\nVehicle {vehicle} ({user_name}) has been reported for: {violation}. Case ID: {case_id}. Please take necessary action."
+            from twilio.rest import Client
+            try:
+                msg = client.messages.create(from_=twilio_from, body=challan_msg, to=tow_number)
+                sms_result = {'status': 'sent', 'sid': getattr(msg, 'sid', None), 'phone': tow_number}
+            except Exception as e:
+                sms_result = {'status': 'failed', 'error': str(e), 'phone': tow_number}
+        else:
+            sms_result = {'status': 'failed', 'error': 'Twilio not configured', 'phone': tow_number}
+    except Exception as e:
+        sms_result = {'status': 'failed', 'error': str(e), 'phone': '+917703928478'}
+    return { 'status': 'success', 'sms': sms_result }
 from datetime import datetime
 from typing import Optional
 
