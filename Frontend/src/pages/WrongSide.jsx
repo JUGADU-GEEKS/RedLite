@@ -31,6 +31,11 @@ const WrongSide = () => {
         setCurrentFrame(null);
         setProcessing(true);
 
+        // Close existing connection if any
+        if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+            wsRef.current.close();
+        }
+
         try {
             // Connect to WebSocket for streaming with static file
             const filename = "wrongside.mp4";
@@ -39,43 +44,55 @@ const WrongSide = () => {
 
             wsRef.current.onopen = () => {
                 console.log("WebSocket Connected");
+                setMessage('Connected. Processing video...');
             };
 
             wsRef.current.onmessage = (event) => {
-                const data = JSON.parse(event.data);
-                
-                if (data.frame) {
-                    setCurrentFrame(`data:image/jpeg;base64,${data.frame}`);
-                }
-                
-                if (data.detected_plates) {
-                    setDetectedPlates(data.detected_plates);
-                }
+                try {
+                    const data = JSON.parse(event.data);
+                    
+                    if (data.frame) {
+                        setCurrentFrame(`data:image/jpeg;base64,${data.frame}`);
+                    }
+                    
+                    if (data.detected_plates && Array.isArray(data.detected_plates)) {
+                        setDetectedPlates(data.detected_plates);
+                    }
 
-                if (data.status === "complete") {
-                    setProcessing(false);
-                    setMessage("Analysis Complete.");
-                    wsRef.current.close();
-                }
-                
-                if (data.error) {
-                    setError(`Error: ${data.error}`);
-                    setProcessing(false);
-                    wsRef.current.close();
+                    if (data.status === "complete") {
+                        setProcessing(false);
+                        setMessage("Analysis Complete.");
+                        if (wsRef.current) {
+                            wsRef.current.close();
+                        }
+                    }
+                    
+                    if (data.error) {
+                        setError(`Error: ${data.error}`);
+                        setProcessing(false);
+                        if (wsRef.current) {
+                            wsRef.current.close();
+                        }
+                    }
+                } catch (parseError) {
+                    console.error("Error parsing WebSocket message:", parseError);
                 }
             };
 
             wsRef.current.onerror = (err) => {
                 console.error("WebSocket Error:", err);
-                setError("Connection error during streaming.");
+                setError("Connection error during streaming. Please ensure the backend server is running.");
                 setProcessing(false);
             };
 
-            wsRef.current.onclose = () => {
-                console.log("WebSocket Disconnected");
-                if (processing) {
-                     // If closed unexpectedly
-                     // setProcessing(false); 
+            wsRef.current.onclose = (event) => {
+                console.log("WebSocket Disconnected", event.code, event.reason);
+                if (processing && event.code !== 1000) {
+                    // Unexpected close
+                    if (!error) {
+                        setError("Connection closed unexpectedly. Please try again.");
+                    }
+                    setProcessing(false);
                 }
             };
 
