@@ -288,6 +288,26 @@ const LaneDashboard = () => {
 
       <Navbar />
       <div className="pt-28 px-6 max-w-7xl mx-auto pb-12 relative z-10">
+        {/* Emergency Override Banner */}
+        {isOverride && (
+          <motion.div
+            initial={{ opacity: 0, y: -50 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -50 }}
+            className="fixed top-24 left-0 right-0 z-50 flex justify-center px-4"
+          >
+            <div className="bg-red-600 text-white px-8 py-4 rounded-full shadow-2xl flex items-center gap-4 border-4 border-red-400 animate-pulse">
+              <span className="text-3xl">🚑</span>
+              <div>
+                <h3 className="text-xl font-bold uppercase tracking-wider">Emergency Override Active</h3>
+                <p className="text-red-100 font-medium">
+                  Allowing ambulance from <span className="text-white font-bold underline uppercase">{data.override_direction}</span> lane
+                </p>
+              </div>
+            </div>
+          </motion.div>
+        )}
+
         {/* Header Section */}
         <motion.div
           initial={{ opacity: 0, y: -20 }}
