@@ -371,6 +371,7 @@ VEHICLE_CLASSES = {
     'car': 2,
     'motorcycle': 3,
     'bus': 5,
+    'truck': 7,
 }
 
 # Lane mapping (adjust if needed)
@@ -1217,26 +1218,45 @@ async def websocket_detect(websocket: WebSocket):
 
             # 1. Read one frame per lane and count vehicles
             for lane, cap in caps.items():
-                ret, frame = cap.read()
-                if not ret:
-                    cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
+                try:
                     ret, frame = cap.read()
-                results = model(frame)
-                boxes = results[0].boxes
-                counts = {'car': 0, 'motorcycle': 0, 'bus': 0}
-                cow_detected = False
-                detected_classes = []
-                for box in boxes:
-                    cls = int(box.cls[0])
-                    detected_classes.append(cls)
-                    # Treat class 19 as 'cow' for this model
-                    if cls == 19:
-                        cow_detected = True
-                    for name, class_id in VEHICLE_CLASSES.items():
-                        if cls == class_id:
-                            counts[name] += 1
-                print(f"[DEBUG] Lane: {lane}, Detected class IDs: {detected_classes}")
-                vehicle_counts[lane] = sum(counts.values())
+                    if not ret:
+                        cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
+                        ret, frame = cap.read()
+                    
+                    if not ret or frame is None:
+                        print(f"[WARNING] Failed to read frame for lane {lane}")
+                        continue
+                    
+                    results = model(frame, verbose=False)
+                    boxes = results[0].boxes if hasattr(results[0], 'boxes') and results[0].boxes is not None else None
+                    
+                    counts = {'car': 0, 'motorcycle': 0, 'bus': 0, 'truck': 0}
+                    cow_detected = False
+                    detected_classes = []
+                    
+                    if boxes is not None and len(boxes) > 0:
+                        for box in boxes:
+                            try:
+                                cls = int(box.cls[0])
+                                detected_classes.append(cls)
+                                # Treat class 19 as 'cow' for this model
+                                if cls == 19:
+                                    cow_detected = True
+                                for name, class_id in VEHICLE_CLASSES.items():
+                                    if cls == class_id:
+                                        counts[name] += 1
+                            except (IndexError, ValueError, AttributeError) as e:
+                                print(f"[WARNING] Error processing box in lane {lane}: {e}")
+                                continue
+                    
+                    print(f"[DEBUG] Lane: {lane}, Detected class IDs: {detected_classes}, Counts: {counts}")
+                    vehicle_counts[lane] = sum(counts.values())
+                except Exception as e:
+                    print(f"[ERROR] Error processing lane {lane}: {e}")
+                    import traceback
+                    traceback.print_exc()
+                    continue
                 
                 # Calculate priority order based on vehicle counts
                 priority_order = sorted(vehicle_counts.keys(), key=lambda l: vehicle_counts[l], reverse=True)
@@ -1251,20 +1271,39 @@ async def websocket_detect(websocket: WebSocket):
                         print(f"[ALERT] Cow detected in {lane}, alert sent!")
                 elif not cow_detected:
                     cow_alert_sent[lane] = False  # Reset if cow is gone
-                annotated_frame = results[0].plot()
-                _, buffer = cv2.imencode('.jpg', annotated_frame)
-                frame_b64 = base64.b64encode(buffer).decode('utf-8')
-                await websocket.send_json({
-                    'frame': frame_b64,
-                    'counts': counts,
-                    'total': vehicle_counts[lane],
-                    'video': LANE_VIDEO_MAP[lane],
-                    'lights': lights,
-                    'current_green': current_green,
-                    'last_green_time': last_green_time,
-                    'vehicle_counts': vehicle_counts,
-                    'priority_order': priority_order
-                })
+                    try:
+                        annotated_frame = results[0].plot()
+                        _, buffer = cv2.imencode('.jpg', annotated_frame, [cv2.IMWRITE_JPEG_QUALITY, 85])
+                        if buffer is not None:
+                            frame_b64 = base64.b64encode(buffer).decode('utf-8')
+                            await websocket.send_json({
+                                'frame': frame_b64,
+                                'counts': counts,
+                                'total': vehicle_counts[lane],
+                                'video': LANE_VIDEO_MAP[lane],
+                                'lights': lights,
+                                'current_green': current_green,
+                                'last_green_time': last_green_time,
+                                'vehicle_counts': vehicle_counts,
+                                'priority_order': priority_order
+                            })
+                    except Exception as e:
+                        print(f"[ERROR] Error encoding/sending frame for lane {lane}: {e}")
+                        # Send without frame if encoding fails
+                        try:
+                            await websocket.send_json({
+                                'frame': None,
+                                'counts': counts,
+                                'total': vehicle_counts[lane],
+                                'video': LANE_VIDEO_MAP[lane],
+                                'lights': lights,
+                                'current_green': current_green,
+                                'last_green_time': last_green_time,
+                                'vehicle_counts': vehicle_counts,
+                                'priority_order': priority_order
+                            })
+                        except:
+                            pass
 
             # 2. Decide on light switching
             now = time.time()
