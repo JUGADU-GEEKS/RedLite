@@ -4,6 +4,7 @@ import ProtectedRoute from '../components/ProtectedRoute';
 
 function AuthorityDashboardInner() {
   const [items, setItems] = useState([]);
+  const [userPhones, setUserPhones] = useState({});
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
@@ -12,8 +13,22 @@ function AuthorityDashboardInner() {
     try {
       const res = await fetch(`${import.meta.env.VITE_API_URL}/sos/list`);
       const jd = await res.json();
-      if (jd.status === 'success') setItems(jd.items || []);
-      else setError(jd.message || 'Failed to load');
+      if (jd.status === 'success') {
+        setItems(jd.items || []);
+        // Fetch user phones for each userId
+        const userIds = Array.from(new Set((jd.items || []).map(i => i.userId)));
+        const phones = {};
+        await Promise.all(userIds.map(async (uid) => {
+          try {
+            const pres = await fetch(`${import.meta.env.VITE_API_URL}/auth/profile?userId=${uid}`);
+            if (pres.ok) {
+              const pj = await pres.json();
+              phones[uid] = pj.user?.mobile || pj.user?.phone || 'Not provided';
+            }
+          } catch {}
+        }));
+        setUserPhones(phones);
+      } else setError(jd.message || 'Failed to load');
     } catch (e) {
       setError(e.message);
     } finally {
@@ -74,7 +89,7 @@ function AuthorityDashboardInner() {
                 <tr key={item.caseId} className="border-t">
                   <td className="px-3 py-2 font-mono text-xs">{item.caseId}</td>
                   <td className="px-3 py-2">{item.userName}</td>
-                  <td className="px-3 py-2">{item.phone}</td>
+                  <td className="px-3 py-2">{userPhones[item.userId] || item.phone}</td>
                   <td className="px-3 py-2">{item.latitude},{item.longitude}</td>
                   <td className="px-3 py-2">{item.vehicle}</td>
                   <td className="px-3 py-2">{item.timestamp}</td>

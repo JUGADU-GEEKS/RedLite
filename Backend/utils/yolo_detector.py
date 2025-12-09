@@ -2,7 +2,8 @@ import cv2
 import base64
 import logging
 import os
-from typing import Dict, Tuple
+import random
+from typing import Dict, Tuple, List
 
 from ultralytics import YOLO
 from core.config import LANES, MODEL_PATH, VIDEOS_DIR, LANE_VIDEO_MAP
@@ -33,6 +34,12 @@ class VideoYOLODetector:
         self.video_captures = {}
         self.model = None
         self.fallback_detector = FallbackDetector()
+        # cache lane->video mapping per intersection for stable assignments during runtime
+        global _INTERSECTION_VIDEO_MAPS
+        try:
+            _INTERSECTION_VIDEO_MAPS
+        except NameError:
+            _INTERSECTION_VIDEO_MAPS = {}
 
         logger.info(f"Initializing VideoYOLODetector for intersection {intersection_id}")
         logger.info(f"VIDEOS_DIR: {VIDEOS_DIR}")
@@ -48,8 +55,11 @@ class VideoYOLODetector:
             logger.warning(f"YOLO model load failed: {e} — using fallback detector.")
             self.model = None
 
+        # Determine lane->video mapping for this intersection
+        lane_video_map = self._get_or_create_lane_video_map()
+
         for lane in LANES:
-            video_file = LANE_VIDEO_MAP.get(lane)
+            video_file = lane_video_map.get(lane) or LANE_VIDEO_MAP.get(lane)
             if not video_file:
                 logger.warning(f"No video file mapping for lane '{lane}'")
                 continue
@@ -70,6 +80,49 @@ class VideoYOLODetector:
                 logger.error(f"✗ Video for lane '{lane}' not found at {video_path}")
         
         logger.info(f"Loaded {len(self.video_captures)}/{len(LANES)} video captures")
+
+    def _list_candidate_videos(self) -> List[str]:
+        try:
+            files = os.listdir(VIDEOS_DIR)
+        except Exception as e:
+            logger.warning(f"Unable to list videos in {VIDEOS_DIR}: {e}")
+            return []
+        banned = {"5.mp4", "wrongside.mp4"}
+        vids = [f for f in files if f.lower().endswith(".mp4") and f not in banned]
+        return vids
+
+    def _get_or_create_lane_video_map(self) -> Dict[str, str]:
+        global _INTERSECTION_VIDEO_MAPS
+        if self.intersection_id in _INTERSECTION_VIDEO_MAPS:
+            return _INTERSECTION_VIDEO_MAPS[self.intersection_id]
+
+        candidates = self._list_candidate_videos()
+        # Ensure deterministic but pseudo-random per intersection if needed
+        rng = random.Random()
+        rng.seed(self.intersection_id)
+        rng.shuffle(candidates)
+
+        # Select up to 4 distinct videos; if fewer, pad using defaults (without banned)
+        selected = candidates[:len(LANES)]
+
+        if len(selected) < len(LANES):
+            # Fill from defaults while avoiding duplicates and banned
+            banned = {"5.mp4", "wrongside.mp4"}
+            defaults = [v for v in [LANE_VIDEO_MAP.get(l) for l in LANES] if v and v not in banned]
+            for v in defaults:
+                if len(selected) >= len(LANES):
+                    break
+                if v not in selected:
+                    selected.append(v)
+
+        # As a last resort, if still fewer than 4, allow repeats to avoid breaking pipeline
+        while len(selected) < len(LANES) and candidates:
+            selected.append(candidates[len(selected) % len(candidates)])
+
+        lane_video_map = {lane: selected[i] for i, lane in enumerate(LANES) if i < len(selected)}
+        _INTERSECTION_VIDEO_MAPS[self.intersection_id] = lane_video_map
+        logger.info(f"[VIDEOS] Assigned for {self.intersection_id}: {lane_video_map}")
+        return lane_video_map
 
     def _process_frame(self, lane: str, frame):
         if self.model:

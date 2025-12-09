@@ -82,8 +82,16 @@ async def send_sos(data: dict = Body(...), request: Request = None):
     # Use authenticated user info primarily; fall back to request body for non-sensitive fields
     user_id = (user_record.get('userId') if user_record else None) or data.get('userId') or data.get('user_id') or 'unknown'
     user_name = (user_record.get('name') if user_record else None) or data.get('userName') or data.get('user') or 'Unknown'
-    # Prefer mobile/phone stored on user record; if absent, use payload phone (less trusted)
-    phone = (user_record.get('mobile') if user_record else None) or (user_record.get('phone') if user_record else None) or data.get('phone') or 'Not provided'
+    # Always fetch phone from user profile using userId
+    phone = 'Not provided'
+    try:
+        from deps.auth_deps import get_db
+        db = await get_db()
+        user_doc = await db.users.find_one({'userId': user_id})
+        if user_doc:
+            phone = user_doc.get('mobile') or user_doc.get('phone') or 'Not provided'
+    except Exception:
+        phone = (user_record.get('mobile') if user_record else None) or (user_record.get('phone') if user_record else None) or data.get('phone') or 'Not provided'
     vehicle = (user_record.get('vehicle') if user_record else None) or (user_record.get('vehicleId') if user_record else None) or data.get('vehicle') or data.get('vehicleId') or 'not provided'
 
     # Parse coordinates safely; allow None and handle later

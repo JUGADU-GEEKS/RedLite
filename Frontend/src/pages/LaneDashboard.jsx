@@ -156,7 +156,8 @@ const LaneDashboard = () => {
   }, [signalStatus]);
 
   useEffect(() => {
-    const ws = new WebSocket('ws://localhost:8000/ws/lane_feed');
+    const q = intersectionId ? `?intersectionId=${encodeURIComponent(intersectionId)}` : '';
+    const ws = new WebSocket(`ws://localhost:8000/ws/lane_feed${q}`);
 
     ws.onopen = () => {
       console.log('WebSocket connected');
@@ -204,7 +205,7 @@ const LaneDashboard = () => {
     return () => {
       ws.close();
     };
-  }, [token]);
+  }, [token, intersectionId]);
 
   useEffect(() => {
     durationsRef.current = durations;

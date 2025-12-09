@@ -125,6 +125,9 @@ async def acknowledge_case(case_id: str, action: str = 'ack', ack_by: str = 'aut
             # Fault tolerance logic for report action
             try:
                 user_id = record.get('userId')
+                user_name = record.get('userName')
+                user_email = record.get('email', None)
+                logger.info(f"[REPORT] Attempting fault count update for userId={user_id}, userName={user_name}, email={user_email}")
                 if user_id and user_id != 'unknown':
                     summary = {'caseId': case_id, 'timestamp': time.strftime('%Y-%m-%d %H:%M:%S'), 'status': new_status}
                     await db.users.update_one({'userId': user_id}, {'$push': {'sos_history': summary}})
@@ -139,6 +142,8 @@ async def acknowledge_case(case_id: str, action: str = 'ack', ack_by: str = 'aut
                             suspended = fault_count >= 3
                             await db.users.update_one({'userId': user_id}, {'$set': {'fault_count': fault_count, 'suspended': suspended}})
                             logger.info(f"[REPORT] User {user_id} fault_count incremented to {fault_count}, suspended={suspended}")
+                else:
+                    logger.error(f"[REPORT] Could not update fault count: userId missing in SOS record (caseId={case_id})")
             except Exception as e:
                 logger.error(f"[ACK] Failed to update user's sos_history or fault count: {e}")
 
