@@ -258,7 +258,7 @@ const SOS = () => {
               <div className="flex items-center justify-center mb-6">
                 <AlertTriangle className="w-12 h-12 text-red-500 mr-4" />
                 <h1 className="text-5xl md:text-6xl font-bold bg-gradient-to-r from-red-600 via-orange-500 to-red-600 bg-clip-text text-transparent font-serif leading-tight">
-                  Emergency SOS
+                  Emergency Tow Service
                 </h1>
               </div>
               <div className="w-24 h-1 bg-gradient-to-r from-red-500 to-orange-500 rounded-full mx-auto mb-8"></div>
@@ -275,7 +275,7 @@ const SOS = () => {
               </span>
               <br />
               <span className="text-lg text-gray-500 mt-2 block">
-                Use only in real emergencies requiring immediate police assistance
+                Use only in real roadside emergencies requiring urgent towing support.
               </span>
             </motion.p>
 
@@ -348,8 +348,8 @@ const SOS = () => {
                     </div>
                   ) : (
                     <div className="flex flex-col items-center">
-                      <span className="text-5xl mb-2">SOS</span>
-                      <span className="text-sm">EMERGENCY</span>
+                      {/* <span className="text-5xl mb-2">SOS</span> */}
+                      <span className="text-m">EMERGENCY</span>
                     </div>
                   )}
                 </motion.button>

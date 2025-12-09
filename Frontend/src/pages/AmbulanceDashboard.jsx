@@ -114,69 +114,65 @@ const AmbulanceDashboard = () => {
         }
     }, []);
 
+    // Poll override_state provided by ESP (no browser geolocation)
     useEffect(() => {
-        if (!navigator.geolocation) {
-            setGeoError('Geolocation is not supported by this browser.');
-            return;
-        }
-        watchIdRef.current = navigator.geolocation.watchPosition(
-            (pos) => {
-                const coords = pos.coords;
-                const snapshot = {
-                    lat: coords.latitude,
-                    lon: coords.longitude,
-                    speed: typeof coords.speed === 'number' ? coords.speed : 0,
-                    headingNative: typeof coords.heading === 'number' ? coords.heading : null,
-                    accuracy: coords.accuracy,
-                    ts: pos.timestamp || Date.now()
-                };
-                const derivedHeading = deriveHeadingDeg(snapshot, lastPosRef.current);
-                setHeadingDeg(derivedHeading);
-                setHeadingCardinal(headingToCardinal(derivedHeading));
-                const nextPos = { ...snapshot, headingDeg: derivedHeading };
-                lastPosRef.current = { lat: snapshot.lat, lon: snapshot.lon };
-                currentPosRef.current = nextPos;
-                headingRef.current = derivedHeading;
-                setCurrentPos(nextPos);
-                
-                // Save to localStorage for next refresh
-                try {
-                    localStorage.setItem('ambulance_last_position', JSON.stringify({
-                        lat: snapshot.lat,
-                        lon: snapshot.lon,
-                        speed: snapshot.speed,
-                        headingDeg: derivedHeading,
-                        accuracy: snapshot.accuracy,
-                        ts: snapshot.ts
-                    }));
-                } catch (e) {
-                    console.error('Failed to save position to localStorage', e);
+        let cancelled = false;
+        const directionToHeading = (dir) => {
+            if (!dir) return null;
+            const map = { north: 0, east: 90, south: 180, west: 270 };
+            return map[dir] ?? null;
+        };
+
+        const fetchOverride = async () => {
+            try {
+                const res = await fetch('http://localhost:8000/override_state');
+                if (!res.ok) throw new Error('Failed to fetch override_state');
+                const data = await res.json();
+                if (cancelled) return;
+
+                // Update currentPos from ESP-provided location
+                if (data && data.ambulance_lat != null && data.ambulance_long != null) {
+                    const lat = Number(data.ambulance_lat);
+                    const lon = Number(data.ambulance_long);
+                    const headingDegVal = directionToHeading(data.direction || data.dir || null);
+                    const nextPos = {
+                        lat,
+                        lon,
+                        speed: data.speed ?? 0,
+                        headingDeg: headingDegVal,
+                        ts: Date.now()
+                    };
+                    lastPosRef.current = { lat: nextPos.lat, lon: nextPos.lon };
+                    currentPosRef.current = nextPos;
+                    headingRef.current = nextPos.headingDeg;
+                    setHeadingDeg(nextPos.headingDeg);
+                    setHeadingCardinal(headingToCardinal(nextPos.headingDeg));
+                    setCurrentPos(nextPos);
                 }
-            },
-            (err) => {
-                console.error(err);
-                setGeoError(err.message || 'Unable to read GPS signal');
-            },
-            GEO_OPTIONS
-        );
 
-        warmupTimerRef.current = setTimeout(() => {
-            setWarmupComplete(true);
-            setWarmupCountdown(0);
-            if (warmupCountdownRef.current) {
-                clearInterval(warmupCountdownRef.current);
-                warmupCountdownRef.current = null;
+                // Also store driver/override status for small UI hints
+                setDriverStatus({
+                    active: data.active,
+                    nearest_intersection_id: data.nearest_intersection_id,
+                    nearest_intersection_name: data.nearest_intersection_name,
+                    distance_m: data.distance_m,
+                    estimated_eta_s: data.estimated_eta_s,
+                    used_default_speed: data.used_default_speed,
+                    default_speed_mps: data.default_speed_mps
+                });
+            } catch (err) {
+                console.error('Failed to poll override_state', err);
+                setGeoError('Failed to fetch ambulance override state');
             }
-        }, WARMUP_DURATION_MS);
+        };
 
-        warmupCountdownRef.current = setInterval(() => {
-            setWarmupCountdown((prev) => {
-                const next = Math.max(0, prev - 1);
-                return next;
-            });
-        }, 1000);
-
-        return cleanupAll;
+        // Initial fetch and interval
+        fetchOverride();
+        const id = setInterval(fetchOverride, 2000);
+        return () => {
+            cancelled = true;
+            clearInterval(id);
+        };
     }, []);
 
     useEffect(() => {
@@ -385,7 +381,7 @@ const AmbulanceDashboard = () => {
         }
     };
 
-    const isActive = Boolean(overrideSnapshot);
+    const isActive = Boolean(driverStatus?.active);
     const telemetry = currentPos
         ? {
             lat: currentPos.lat.toFixed(6),
@@ -495,34 +491,10 @@ const AmbulanceDashboard = () => {
                             </div>
                         </div>
 
-                        <div className="mt-4 flex gap-3">
-                            {warmupComplete ? (
-                                <button
-                                    onClick={handleStart}
-                                    disabled={isActive || isStarting || !nearestAhead}
-                                    className={`flex-1 py-3 rounded-2xl font-semibold transition-all ${
-                                        isActive || isStarting || !nearestAhead
-                                            ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
-                                            : 'bg-amber-500 hover:bg-amber-400 text-white shadow-lg'
-                                    }`}
-                                >
-                                    {isStarting ? 'Requesting...' : 'Start Emergency'}
-                                </button>
-                            ) : (
-                                <div className="flex-1 py-3 rounded-2xl bg-gray-100 text-gray-500 text-center font-semibold">
-                                    Initializing sensors... {warmupCountdown}s
-                                </div>
-                            )}
-
-                            {isActive && (
-                                <button
-                                    onClick={handleStop}
-                                    disabled={isStopping}
-                                    className="py-3 px-6 rounded-2xl font-semibold bg-red-500 hover:bg-red-600 text-white shadow-lg"
-                                >
-                                    {isStopping ? 'Stopping...' : 'Stop Override'}
-                                </button>
-                            )}
+                        <div className="mt-4">
+                            <div className="py-3 rounded-2xl bg-amber-50 border border-amber-100 text-amber-700 text-sm p-3">
+                                Automatic override active: server uses ESP-provided ambulance location. No manual "Start Emergency" required.
+                            </div>
                         </div>
 
                         {nearestAhead && (
@@ -546,18 +518,27 @@ const AmbulanceDashboard = () => {
                             <span className="text-xs text-gray-500">{annotatedIntersections.length} intersections</span>
                         </div>
 
-                        <div className="grid grid-cols-2 gap-4">
+                            <div className="grid grid-cols-2 gap-4">
                             <div className="bg-white p-3 rounded-xl border">
                                 <p className="text-xs text-gray-500">Current Override</p>
-                                <p className="font-bold text-gray-900">{driverStatus?.status ?? 'IDLE'}</p>
+                                <p className="font-bold text-gray-900">{driverStatus?.active ? 'ACTIVE' : 'IDLE'}</p>
                             </div>
                             <div className="bg-white p-3 rounded-xl border">
-                                <p className="text-xs text-gray-500">Remaining</p>
-                                <p className="font-bold text-gray-900">{driverStatus?.remainingSeconds ? `${Math.round(driverStatus.remainingSeconds)} s` : '--'}</p>
+                                <p className="text-xs text-gray-500">Nearest</p>
+                                <p className="font-bold text-gray-900">{driverStatus?.nearest_intersection_name ?? driverStatus?.nearest_intersection_id ?? '--'}</p>
                             </div>
                             <div className="col-span-2 bg-white p-3 rounded-xl border">
-                                <p className="text-xs text-gray-500">Request</p>
-                                <p className="font-mono text-sm break-all">{backendResponse?.requestId ?? '--'}</p>
+                                <p className="text-xs text-gray-500">ETA to nearest</p>
+                                <p className="font-bold text-gray-900">
+                                    {driverStatus?.estimated_eta_s ? (
+                                        driverStatus.estimated_eta_s < 60
+                                            ? `${Math.round(driverStatus.estimated_eta_s)} s`
+                                            : `${(driverStatus.estimated_eta_s / 60).toFixed(1)} min`
+                                    ) : '--'}
+                                </p>
+                                {driverStatus?.used_default_speed && (
+                                    <p className="text-xs text-gray-500 mt-1">Assuming speed {driverStatus.default_speed_mps} m/s for ETA</p>
+                                )}
                             </div>
                         </div>
                     </div>
@@ -590,10 +571,7 @@ const AmbulanceDashboard = () => {
                     <div className="space-y-6">
                         <div className="bg-white/60 backdrop-blur-sm p-6 rounded-3xl shadow-xl border border-white/50">
                             <h3 className="text-lg font-bold mb-3">Controls</h3>
-                            <div className="flex flex-col gap-3">
-                                <button onClick={handleStart} className="py-3 bg-amber-500 text-white rounded-xl shadow">Start Emergency</button>
-                                <button onClick={handleStop} className="py-3 bg-white border rounded-xl">Stop Emergency</button>
-                            </div>
+                            <div className="text-sm text-gray-600">Override is automatic based on ESP telemetry. Manual controls removed.</div>
                         </div>
 
                         <div className="bg-white/60 backdrop-blur-sm p-6 rounded-3xl shadow-xl border border-white/50">

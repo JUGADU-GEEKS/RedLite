@@ -371,6 +371,7 @@ VEHICLE_CLASSES = {
     'car': 2,
     'motorcycle': 3,
     'bus': 5,
+    'truck': 7,
 }
 
 # Lane mapping (adjust if needed)
@@ -462,11 +463,25 @@ async def send_call_alert_endpoint(data: dict = Body(...)):
 
 TRAFFIC_LIGHT_COORDS = (28.612091,77.037639)
 AMBULANCE_OVERRIDE_DURATION = 30  # seconds
+# Override configuration
+OVERRIDE_DISTANCE_THRESHOLD_M = 20  # meters: proximity threshold to trigger override
+DEFAULT_EST_SPEED_MPS = 20.0  # m/s: fallback speed when ESP reports 0 or missing
 ambulance_override = {
     'active': False,
     'direction': None,
-    'end_time': 0
+    'end_time': 0,
+    # Live ESP-provided ambulance location
+    'ambulance_lat': None,
+    'ambulance_long': None,
+    'device_key': None,
+    # Nearest intersection snapshot
+    'nearest_intersection_id': None,
+    'nearest_intersection_name': None,
+    'distance_m': None,
+    'estimated_eta_s': None
 }
+# cooldown_until (timestamp): do not re-activate override until this time after a clear
+ambulance_override['cooldown_until'] = None
 
 # Configuration file for traffic light coordinates
 CONFIG_FILE = 'traffic_config.json'
@@ -652,23 +667,247 @@ def haversine(lat1, lon1, lat2, lon2):
 @app.post('/ambulance_override')
 async def ambulance_override_post(request: Request):
     data = await request.json()
-    lat = float(data.get('lat'))
-    lon = float(data.get('long'))
+    # Accept multiple possible keys for compatibility with devices
+    raw_lat = data.get('ambulance_lat', data.get('lat', None))
+    raw_long = data.get('ambulance_long', data.get('long', data.get('lng', None)))
     direction = data.get('direction')
-    if direction not in ['north', 'south', 'east', 'west']:
+    device_key = data.get('device_key') if 'device_key' in data else None
+
+    # Require lat/long and direction
+    if raw_lat is None or raw_long is None:
+        print("[AMBULANCE] Missing latitude/longitude in ESP payload")
+        return JSONResponse({'status': 'error', 'message': 'Missing ambulance_lat / ambulance_long'}, status_code=400)
+
+    try:
+        lat = float(raw_lat)
+        lon = float(raw_long)
+    except Exception as e:
+        print(f"[AMBULANCE] Invalid lat/long values: {raw_lat}, {raw_long} -> {e}")
+        return JSONResponse({'status': 'error', 'message': 'Invalid lat/long values'}, status_code=400)
+
+    # Validate direction if present
+    if direction is not None and direction not in ['north', 'south', 'east', 'west']:
         print(f"[AMBULANCE] Invalid direction: {direction}")
-        return {"status": "error", "message": "Invalid direction"}
-    dist = haversine(lat, lon, TRAFFIC_LIGHT_COORDS[0], TRAFFIC_LIGHT_COORDS[1])
-    print(f"[AMBULANCE] Received: lat={lat}, lon={lon}, direction={direction}, distance={dist:.2f}m")
-    if dist <= 5:
-        ambulance_override['active'] = True
-        ambulance_override['direction'] = direction
-        ambulance_override['end_time'] = time.time() + AMBULANCE_OVERRIDE_DURATION
-        print(f"[AMBULANCE] Ambulance within 5m, OVERRIDING {direction} to GREEN for {AMBULANCE_OVERRIDE_DURATION}s")
-        return {"status": "ok", "override": True}
+        return JSONResponse({'status': 'error', 'message': 'Invalid direction'}, status_code=400)
+
+    # Debug log confirming receipt
+    print(f"🚑 ESP Update → lat={lat}, long={lon}, dir={direction}, device_key={device_key}")
+
+    # Fetch all intersections from DB
+    try:
+        from services import intersection_service
+        all_intersections = intersection_service.get_all_intersections(limit=1000)
+    except Exception as e:
+        print(f"[AMBULANCE] Failed to load intersections: {e}")
+        return JSONResponse({'status': 'error', 'message': 'Failed to load intersections'}, status_code=500)
+
+    # Compute distances using haversine and find nearest
+    nearest = None
+    for ix in all_intersections:
+        # intersections may store coordinates under 'coordinates' or directly
+        if isinstance(ix, dict):
+            coords = ix.get('coordinates') or {'lat': ix.get('lat'), 'lon': ix.get('long', ix.get('lon'))}
+            ix_id = ix.get('intersectionId') or ix.get('_id') or ix.get('id')
+            ix_name = ix.get('name') or ix.get('intersectionName')
+        else:
+            # Defensive: try to access attributes
+            coords = getattr(ix, 'coordinates', None)
+            ix_id = getattr(ix, 'intersectionId', None)
+            ix_name = getattr(ix, 'name', None)
+
+        if not coords or 'lat' not in coords or ('lon' not in coords and 'long' not in coords):
+            continue
+
+        i_lat = coords.get('lat')
+        i_lon = coords.get('lon', coords.get('long'))
+        try:
+            i_lat = float(i_lat)
+            i_lon = float(i_lon)
+        except Exception:
+            continue
+
+        d = haversine(lat, lon, i_lat, i_lon)
+
+        if nearest is None or d < nearest['distance']:
+            nearest = {
+                'intersectionId': ix_id,
+                'name': ix_name,
+                'lat': i_lat,
+                'lon': i_lon,
+                'distance': d
+            }
+
+    if nearest:
+        distance_m = nearest['distance']
+        print(f"🔍 Nearest intersection: {nearest.get('name') or nearest.get('intersectionId')} — {distance_m:.1f} meters")
     else:
-        print(f"[AMBULANCE] Ambulance not close enough for override.")
-        return {"status": "ok", "override": False}
+        distance_m = None
+        print("🔍 No intersections found in DB")
+
+    # Estimate ETA: use provided speed if >0 else fall back to DEFAULT_EST_SPEED_MPS
+    raw_speed = data.get('speed')
+    speed = None
+    used_default_speed = False
+    try:
+        if raw_speed is not None:
+            speed = float(raw_speed)
+    except Exception:
+        speed = None
+
+    if speed is None or speed <= 0:
+        used_default_speed = True
+        speed_for_eta = DEFAULT_EST_SPEED_MPS
+    else:
+        speed_for_eta = speed
+
+    estimated_eta_s = None
+    if distance_m is not None and speed_for_eta and speed_for_eta > 0:
+        estimated_eta_s = distance_m / speed_for_eta
+
+    # Update global override state
+    ambulance_override['ambulance_lat'] = lat
+    ambulance_override['ambulance_long'] = lon
+    ambulance_override['device_key'] = device_key
+    ambulance_override['nearest_intersection_id'] = nearest.get('intersectionId') if nearest else None
+    ambulance_override['nearest_intersection_name'] = nearest.get('name') if nearest else None
+    ambulance_override['distance_m'] = distance_m
+    ambulance_override['estimated_eta_s'] = estimated_eta_s
+    ambulance_override['used_default_speed'] = used_default_speed
+    ambulance_override['default_speed_mps'] = DEFAULT_EST_SPEED_MPS if used_default_speed else None
+
+    # Decide override based on proximity to the nearest intersection
+    override_decision = False
+    now = time.time()
+    cooldown_until = ambulance_override.get('cooldown_until') or 0
+    hold_until = ambulance_override.get('hold_until') or 0
+
+    # Check if we are currently in the "trigger zone"
+    in_trigger_zone = False
+    if distance_m is not None and distance_m <= OVERRIDE_DISTANCE_THRESHOLD_M and direction:
+        in_trigger_zone = True
+
+    should_be_active = False
+    
+    if in_trigger_zone:
+        if cooldown_until and now < cooldown_until:
+            # Cooldown active after a previous clear — do not re-activate immediately
+            should_be_active = False
+            print(f"[AMBULANCE] Cooldown active until {cooldown_until:.0f}, skipping override (distance {distance_m:.1f}m)")
+        else:
+            should_be_active = True
+            # Refresh hold timer to 30s from now (Continuous Hold while in zone)
+            # This ensures that as long as the ambulance is here, we stay active.
+            # And when it leaves, we stay active for another 30s (or remaining time).
+            ambulance_override['hold_until'] = now + AMBULANCE_OVERRIDE_DURATION
+            ambulance_override['cooldown_until'] = None
+            # Store valid direction for hold period
+            ambulance_override['last_valid_direction'] = direction
+    else:
+        # Not in trigger zone, check hold timer
+        if hold_until and now < hold_until:
+            should_be_active = True
+            print(f"[AMBULANCE] Holding active state (remaining {int(hold_until - now)}s)...")
+        else:
+            should_be_active = False
+
+    if should_be_active:
+        ambulance_override['active'] = True
+        # Use current direction if available, else fallback to last valid
+        effective_direction = direction or ambulance_override.get('last_valid_direction')
+        ambulance_override['direction'] = effective_direction
+        
+        # Sync end_time with hold_until for frontend display
+        ambulance_override['end_time'] = ambulance_override.get('hold_until', now + AMBULANCE_OVERRIDE_DURATION)
+        
+        override_decision = True
+        
+        if in_trigger_zone:
+             print(f"[AMBULANCE] Ambulance within {distance_m:.1f}m, OVERRIDING {effective_direction} to GREEN")
+        
+        # Register the override with the emergency_service so LaneService (traffic controller)
+        # observes the active override. We use the device_key as user/vehicle id if available.
+        try:
+            # Use stored owner if available to maintain session
+            user_id = ambulance_override.get('request_owner') or device_key or f"esp_{int(time.time())}"
+            vehicle_id = device_key or user_id
+            # Map cardinal direction to heading degrees for request_override
+            dir_map = { 'north': 0.0, 'east': 90.0, 'south': 180.0, 'west': 270.0 }
+            heading_deg_for_req = dir_map.get(effective_direction, 0.0)
+            # Use speed_for_eta calculated earlier (may be default)
+
+            # If we already created a request for this device, send heartbeat instead of creating a new lock
+            existing_request_id = ambulance_override.get('request_id')
+            if existing_request_id:
+                try:
+                    hb = emergency_service.process_heartbeat(user_id, lat, lon, heading_deg_for_req, speed_for_eta)
+                    print(f"[AMBULANCE] Sent heartbeat to emergency_service for {user_id}: {hb}")
+                except Exception as e:
+                    print(f"[AMBULANCE] Failed to send heartbeat to emergency_service: {e}")
+            else:
+                try:
+                    resp = emergency_service.request_override(user_id, vehicle_id, lat, lon, heading_deg_for_req, speed_for_eta)
+                    # Save returned request id so subsequent ESP updates send heartbeats
+                    rid = resp.get('requestId') or resp.get('request_id') or resp.get('requestId', None)
+                    ambulance_override['request_id'] = rid
+                    ambulance_override['request_owner'] = user_id
+                    print(f"[AMBULANCE] Registered override in emergency_service: {resp}")
+                except Exception as e:
+                    print(f"[AMBULANCE] Failed to register override in emergency_service: {e}")
+        except Exception as e:
+            print(f"[AMBULANCE] Error while attempting to register override: {e}")
+
+    else:
+        # Not close enough or no direction provided — do not override
+        ambulance_override['active'] = False
+        ambulance_override['direction'] = direction
+        print(f"[AMBULANCE] No override. distance_m={distance_m}, direction={direction}")
+        # Try to clear any existing override for this device (best-effort)
+        try:
+            # Clear DB lock if we previously created it for this device
+            user_id = device_key or ambulance_override.get('request_owner')
+            if user_id:
+                stopped = emergency_service.stop_override(user_id)
+                if stopped:
+                    print(f"[AMBULANCE] Cleared override for device {user_id}")
+            # Clear local request tracking
+            ambulance_override.pop('request_id', None)
+            ambulance_override.pop('request_owner', None)
+            # Set cooldown to avoid immediate re-activation
+            # Only set cooldown if we were previously holding (to avoid setting it on every non-match)
+            if hold_until:
+                 ambulance_override['cooldown_until'] = time.time() + AMBULANCE_OVERRIDE_DURATION
+            ambulance_override['hold_until'] = 0 # Reset hold
+        except Exception:
+            pass
+
+    return {
+        'status': 'ok',
+        'override': override_decision,
+        'nearest': nearest,
+        'distance_m': distance_m,
+        'estimated_eta_s': estimated_eta_s
+    }
+
+
+@app.get('/override_state')
+async def get_override_state():
+    """Return the latest ambulance override state including ESP location and nearest intersection."""
+    # Return a minimal, stable structure for frontend consumption
+    state = {
+        'active': ambulance_override.get('active', False),
+        'direction': ambulance_override.get('direction'),
+        'end_time': ambulance_override.get('end_time'),
+        'ambulance_lat': ambulance_override.get('ambulance_lat'),
+        'ambulance_long': ambulance_override.get('ambulance_long'),
+        'device_key': ambulance_override.get('device_key'),
+        'nearest_intersection_id': ambulance_override.get('nearest_intersection_id'),
+        'nearest_intersection_name': ambulance_override.get('nearest_intersection_name'),
+        'distance_m': ambulance_override.get('distance_m'),
+        'estimated_eta_s': ambulance_override.get('estimated_eta_s'),
+        'used_default_speed': ambulance_override.get('used_default_speed', False),
+        'default_speed_mps': ambulance_override.get('default_speed_mps')
+    }
+    return state
 
 @app.post('/update_traffic_coords')
 async def update_traffic_coords(request: Request):
@@ -956,10 +1195,13 @@ async def websocket_detect(websocket: WebSocket):
                     await asyncio.sleep(0.5) # Small delay to allow override to take effect
                     continue  # skip normal logic
                 else:
-                    print(f"[AMBULANCE] OVERRIDE ENDED, resuming normal operation.")
-                    ambulance_override['active'] = False
-                    ambulance_override['direction'] = None
-                    ambulance_override['end_time'] = 0
+                    # DO NOT CLEAR GLOBAL STATE HERE - Let ambulance_override_post handle it
+                    # Just log and proceed to normal logic
+                    print(f"[AMBULANCE] OVERRIDE ENDED (timer expired), resuming normal operation.")
+                    # ambulance_override['active'] = False  <-- REMOVED to prevent race condition
+                    # ambulance_override['direction'] = None
+                    # ambulance_override['end_time'] = 0
+                    
                     # Re-send current status to ensure clients are aware of override end
                     await websocket.send_json({
                         'frame': None,
@@ -976,26 +1218,45 @@ async def websocket_detect(websocket: WebSocket):
 
             # 1. Read one frame per lane and count vehicles
             for lane, cap in caps.items():
-                ret, frame = cap.read()
-                if not ret:
-                    cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
+                try:
                     ret, frame = cap.read()
-                results = model(frame)
-                boxes = results[0].boxes
-                counts = {'car': 0, 'motorcycle': 0, 'bus': 0}
-                cow_detected = False
-                detected_classes = []
-                for box in boxes:
-                    cls = int(box.cls[0])
-                    detected_classes.append(cls)
-                    # Treat class 19 as 'cow' for this model
-                    if cls == 19:
-                        cow_detected = True
-                    for name, class_id in VEHICLE_CLASSES.items():
-                        if cls == class_id:
-                            counts[name] += 1
-                print(f"[DEBUG] Lane: {lane}, Detected class IDs: {detected_classes}")
-                vehicle_counts[lane] = sum(counts.values())
+                    if not ret:
+                        cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
+                        ret, frame = cap.read()
+                    
+                    if not ret or frame is None:
+                        print(f"[WARNING] Failed to read frame for lane {lane}")
+                        continue
+                    
+                    results = model(frame, verbose=False)
+                    boxes = results[0].boxes if hasattr(results[0], 'boxes') and results[0].boxes is not None else None
+                    
+                    counts = {'car': 0, 'motorcycle': 0, 'bus': 0, 'truck': 0}
+                    cow_detected = False
+                    detected_classes = []
+                    
+                    if boxes is not None and len(boxes) > 0:
+                        for box in boxes:
+                            try:
+                                cls = int(box.cls[0])
+                                detected_classes.append(cls)
+                                # Treat class 19 as 'cow' for this model
+                                if cls == 19:
+                                    cow_detected = True
+                                for name, class_id in VEHICLE_CLASSES.items():
+                                    if cls == class_id:
+                                        counts[name] += 1
+                            except (IndexError, ValueError, AttributeError) as e:
+                                print(f"[WARNING] Error processing box in lane {lane}: {e}")
+                                continue
+                    
+                    print(f"[DEBUG] Lane: {lane}, Detected class IDs: {detected_classes}, Counts: {counts}")
+                    vehicle_counts[lane] = sum(counts.values())
+                except Exception as e:
+                    print(f"[ERROR] Error processing lane {lane}: {e}")
+                    import traceback
+                    traceback.print_exc()
+                    continue
                 
                 # Calculate priority order based on vehicle counts
                 priority_order = sorted(vehicle_counts.keys(), key=lambda l: vehicle_counts[l], reverse=True)
@@ -1010,20 +1271,39 @@ async def websocket_detect(websocket: WebSocket):
                         print(f"[ALERT] Cow detected in {lane}, alert sent!")
                 elif not cow_detected:
                     cow_alert_sent[lane] = False  # Reset if cow is gone
-                annotated_frame = results[0].plot()
-                _, buffer = cv2.imencode('.jpg', annotated_frame)
-                frame_b64 = base64.b64encode(buffer).decode('utf-8')
-                await websocket.send_json({
-                    'frame': frame_b64,
-                    'counts': counts,
-                    'total': vehicle_counts[lane],
-                    'video': LANE_VIDEO_MAP[lane],
-                    'lights': lights,
-                    'current_green': current_green,
-                    'last_green_time': last_green_time,
-                    'vehicle_counts': vehicle_counts,
-                    'priority_order': priority_order
-                })
+                    try:
+                        annotated_frame = results[0].plot()
+                        _, buffer = cv2.imencode('.jpg', annotated_frame, [cv2.IMWRITE_JPEG_QUALITY, 85])
+                        if buffer is not None:
+                            frame_b64 = base64.b64encode(buffer).decode('utf-8')
+                            await websocket.send_json({
+                                'frame': frame_b64,
+                                'counts': counts,
+                                'total': vehicle_counts[lane],
+                                'video': LANE_VIDEO_MAP[lane],
+                                'lights': lights,
+                                'current_green': current_green,
+                                'last_green_time': last_green_time,
+                                'vehicle_counts': vehicle_counts,
+                                'priority_order': priority_order
+                            })
+                    except Exception as e:
+                        print(f"[ERROR] Error encoding/sending frame for lane {lane}: {e}")
+                        # Send without frame if encoding fails
+                        try:
+                            await websocket.send_json({
+                                'frame': None,
+                                'counts': counts,
+                                'total': vehicle_counts[lane],
+                                'video': LANE_VIDEO_MAP[lane],
+                                'lights': lights,
+                                'current_green': current_green,
+                                'last_green_time': last_green_time,
+                                'vehicle_counts': vehicle_counts,
+                                'priority_order': priority_order
+                            })
+                        except:
+                            pass
 
             # 2. Decide on light switching
             now = time.time()
