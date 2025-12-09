@@ -95,7 +95,49 @@ async def login(payload: LoginIn, db=Depends(get_db)):
 
 @router.get('/profile')
 async def profile(current_user=Depends(get_current_user)):
-    # Return sanitized profile for the authenticated user, including fault_count and suspended
+    # If userId is provided as a query param, fetch that user's profile (for admin dashboard phone lookup)
+    from fastapi import Request
+    def get_query_user_id(request: Request):
+        try:
+            return request.query_params.get('userId')
+        except Exception:
+            return None
+
+    import inspect
+    frame = inspect.currentframe()
+    request = None
+    while frame:
+        if 'request' in frame.f_locals:
+            request = frame.f_locals['request']
+            break
+        frame = frame.f_back
+
+    query_user_id = get_query_user_id(request) if request else None
+    if query_user_id:
+        # Only allow admin/employee to fetch other users' profiles
+        allowed_roles = ['admin', 'employee']
+        if current_user.get('role') not in allowed_roles:
+            from fastapi import Response
+            return Response(status_code=403, content='Forbidden')
+        from deps.auth_deps import get_db
+        db = await get_db()
+        user_doc = await db.users.find_one({'userId': query_user_id})
+        if not user_doc:
+            return {'status': 'error', 'message': 'User not found', 'user': None}
+        return {
+            'status': 'success',
+            'user': {
+                'userId': user_doc.get('userId'),
+                'email': user_doc.get('email'),
+                'name': user_doc.get('name'),
+                'mobile': user_doc.get('mobile'),
+                'role': user_doc.get('role'),
+                'ambulanceInfo': user_doc.get('ambulanceInfo'),
+                'fault_count': user_doc.get('fault_count', 0),
+                'suspended': user_doc.get('suspended', False)
+            }
+        }
+    # Default: Return authenticated user's profile
     return {
         'status': 'success',
         'user': {

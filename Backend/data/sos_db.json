@@ -2171,5 +2171,221 @@
     "sms": [],
     "ack_time": "2025-12-09 01:41:55",
     "ack_by": "authority"
+  },
+  {
+    "caseId": "0419213064b7417b8afdb9fd651979a6",
+    "timestamp": "2025-12-09 06:27:48",
+    "userId": "USER-158BC1F7",
+    "userName": "XYZ",
+    "phone": "+919910974301",
+    "vehicle": "not provided",
+    "latitude": 21.4953009,
+    "longitude": 83.9002918,
+    "status": "Reported",
+    "authorities": [
+      {
+        "name": "Forced Target",
+        "phone": "+917703928478",
+        "lat": null,
+        "lng": null,
+        "distance_km": null
+      }
+    ],
+    "sms": [
+      {
+        "name": "Forced Target",
+        "phone": "+917703928478",
+        "status": "sent",
+        "sid": "SM2b73dff603d23c8b9532bbbdc45ec7c1"
+      },
+      {
+        "name": "Secondary Verified",
+        "phone": "+919910974301",
+        "status": "sent",
+        "sid": "SMfe28a5d434dbbf50e92b1c170639dcdd"
+      }
+    ],
+    "ack_time": "2025-12-09 06:28:55",
+    "ack_by": "authority"
+  },
+  {
+    "caseId": "5759924f25504108be1a773f8316eb3d",
+    "timestamp": "2025-12-09 06:36:10",
+    "userId": "USER-158BC1F7",
+    "userName": "XYZ",
+    "phone": "+919910974301",
+    "vehicle": "not provided",
+    "latitude": 21.4953009,
+    "longitude": 83.9002918,
+    "status": "Reported",
+    "authorities": [
+      {
+        "name": "Forced Target",
+        "phone": "+917703928478",
+        "lat": null,
+        "lng": null,
+        "distance_km": null
+      }
+    ],
+    "sms": [
+      {
+        "name": "Forced Target",
+        "phone": "+917703928478",
+        "status": "sent",
+        "sid": "SM944022e9efa5ae6dbfd97883fbcf6ace"
+      },
+      {
+        "name": "Secondary Verified",
+        "phone": "+919910974301",
+        "status": "sent",
+        "sid": "SM0aae69755816c8a35365e89c061ca383"
+      }
+    ],
+    "ack_time": "2025-12-09 06:36:32",
+    "ack_by": "authority"
+  },
+  {
+    "caseId": "5085b3dbc7524c8e9995227446b03b3b",
+    "timestamp": "2025-12-09 06:47:51",
+    "userId": "USER-158BC1F7",
+    "userName": "XYZ",
+    "phone": "+919910974301",
+    "vehicle": "not provided",
+    "latitude": 21.4953009,
+    "longitude": 83.9002918,
+    "status": "Reported",
+    "authorities": [
+      {
+        "name": "Forced Target",
+        "phone": "+917703928478",
+        "lat": null,
+        "lng": null,
+        "distance_km": null
+      }
+    ],
+    "sms": [
+      {
+        "name": "Forced Target",
+        "phone": "+917703928478",
+        "status": "sent",
+        "sid": "SM19bcfd93e97c98c4dfc4be992f0ee6b3"
+      },
+      {
+        "name": "Secondary Verified",
+        "phone": "+919910974301",
+        "status": "sent",
+        "sid": "SM99d5f7288c0f6e1bdb268a682a18785b"
+      }
+    ],
+    "ack_time": "2025-12-09 06:48:44",
+    "ack_by": "authority"
+  },
+  {
+    "caseId": "9981e2a7770541928d5baca5d17200a5",
+    "timestamp": "2025-12-09 06:51:50",
+    "userId": "USER-B7EE1D69",
+    "userName": "abc",
+    "phone": "+919910974301",
+    "vehicle": "not provided",
+    "latitude": 21.4953009,
+    "longitude": 83.9002918,
+    "status": "Reported",
+    "authorities": [
+      {
+        "name": "Forced Target",
+        "phone": "+917703928478",
+        "lat": null,
+        "lng": null,
+        "distance_km": null
+      }
+    ],
+    "sms": [
+      {
+        "name": "Forced Target",
+        "phone": "+917703928478",
+        "status": "sent",
+        "sid": "SM83e64aaaf61891045ea19fd9f995d794"
+      },
+      {
+        "name": "Secondary Verified",
+        "phone": "+919910974301",
+        "status": "sent",
+        "sid": "SMaf3130520805af34d6a0e20fda42d64e"
+      }
+    ],
+    "ack_time": "2025-12-09 06:52:09",
+    "ack_by": "authority"
+  },
+  {
+    "caseId": "643734dc22ba4f3fa19715c5b68d8fa3",
+    "timestamp": "2025-12-09 07:04:59",
+    "userId": "USER-0E0D0B83",
+    "userName": "xyzw",
+    "phone": "+919910974301",
+    "vehicle": "not provided",
+    "latitude": 21.4957008,
+    "longitude": 83.9024866,
+    "status": "Reported",
+    "authorities": [
+      {
+        "name": "Forced Target",
+        "phone": "+917703928478",
+        "lat": null,
+        "lng": null,
+        "distance_km": null
+      }
+    ],
+    "sms": [
+      {
+        "name": "Forced Target",
+        "phone": "+917703928478",
+        "status": "sent",
+        "sid": "SM534fa78ee44cc921fcf6a0925d161300"
+      },
+      {
+        "name": "Secondary Verified",
+        "phone": "+919910974301",
+        "status": "sent",
+        "sid": "SM3e1e8b2464643abdd4ff778e9d3b0898"
+      }
+    ],
+    "ack_time": "2025-12-09 07:05:21",
+    "ack_by": "authority"
+  },
+  {
+    "caseId": "97a9ada0a0c24fa3bafc32398584dc76",
+    "timestamp": "2025-12-09 10:34:39",
+    "userId": "USER-0E0D0B83",
+    "userName": "xyzw",
+    "phone": "+919910974301",
+    "vehicle": "not provided",
+    "latitude": 20.2959847,
+    "longitude": 85.8246101,
+    "status": "Reported",
+    "authorities": [
+      {
+        "name": "Forced Target",
+        "phone": "+917703928478",
+        "lat": null,
+        "lng": null,
+        "distance_km": null
+      }
+    ],
+    "sms": [
+      {
+        "name": "Forced Target",
+        "phone": "+917703928478",
+        "status": "sent",
+        "sid": "SM3c6b7f938a86d8bdbf2f710ec919571e"
+      },
+      {
+        "name": "Secondary Verified",
+        "phone": "+919910974301",
+        "status": "sent",
+        "sid": "SM309b116fd33116cea8b031af74654a8c"
+      }
+    ],
+    "ack_time": "2025-12-09 10:36:54",
+    "ack_by": "authority"
   }
 ]
