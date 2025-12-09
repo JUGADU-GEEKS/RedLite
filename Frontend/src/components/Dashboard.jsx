@@ -634,6 +634,13 @@ function Dashboard({ onHowItWorksClick, onHomeClick, onDashboardClick, onMapClic
       
       {/* Chat Component - pass detected user coordinates for location-based suggestions */}
       <Chat userCoords={locationStatus.coordinates} />
+
+      {/* Omnidim Chatbot Widget */}
+      <script
+        id="omnidimension-web-widget"
+        async
+        src="https://omnidim.io/web_widget.js?secret_key=b118772bc98c2c632913fcb9c9749307"
+      ></script>
     </div>
   );
 }
