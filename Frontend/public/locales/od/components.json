@@ -1,0 +1,18 @@
+{
+  "laneCard": {
+    "remaining": "ବାକି",
+    "untilGreen": "ସବୁଜ ଆଲୋକ ପର୍ଯ୍ୟନ୍ତ",
+    "sRemaining": "ସେକେଣ୍ଡ୍ ବାକି",
+    "sUntilGreen": "ସେକେଣ୍ଡ୍ ସବୁଜ ଆଲୋକ ପର୍ଯ୍ୟନ୍ତ",
+    "rank": "ର୍ୟାଙ୍କ୍",
+    "noFrame": "କୌଣସି ଫ୍ରେମ୍ ନାହିଁ",
+    "vehicleCount": "ବାହନ ସଂଖ୍ୟା",
+    "age": "ବୟସ",
+    "greenDuration": "ସବୁଜ ଆଲୋକ ଅବଧି",
+    "status": "ସ୍ଥିତି"
+  },
+  "acknowledgement": {
+    "sosAcknowledged": "✔ ଆପଣଙ୍କର SOS ଅନୁରୋଧକୁ ଅଧିକାରୀମାନେ ସ୍ୱୀକୃତି ଦେଇଛନ୍ତି। ସାହାଯ୍ୟ ରାସ୍ତାରେ ଅଛି।"
+  }
+}
+

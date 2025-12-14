@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { Shield, Lock, User, ArrowLeft, Mail, Briefcase } from 'lucide-react';
 import { signup } from '../services/auth';
 
@@ -23,6 +24,7 @@ const FloatingElement = ({ children, delay = 0, duration = 3 }) => (
 );
 
 export default function SignupPage() {
+  const { t } = useTranslation(['pages', 'common']);
   const navigate = useNavigate();
   const [form, setForm] = useState({ 
     name: '', 
@@ -61,20 +63,27 @@ export default function SignupPage() {
 
       await signup(payload);
       // After signup, redirect based on role
+      const path = window.location.pathname;
+      const langMatch = path.match(/^\/(en|hi|od)/);
+      const currentLang = langMatch ? langMatch[1] : 'en';
+      
       if (form.role === 'admin') {
-        navigate('/admin/intersections');
+        navigate(`/${currentLang}/admin/intersections`, { replace: true });
       } else {
-        navigate('/login');
+        navigate(`/${currentLang}/login`, { replace: true });
       }
     } catch (err) {
-      setError('Signup failed. Please try again.');
+      setError(t('common:signupFailed'));
     } finally {
       setLoading(false);
     }
   };
 
   const handleBackClick = () => {
-    navigate('/');
+    const path = window.location.pathname;
+    const langMatch = path.match(/^\/(en|hi|od)/);
+    const currentLang = langMatch ? langMatch[1] : 'en';
+    navigate(currentLang === 'en' ? '/' : `/${currentLang}/`);
   };
 
   return (
@@ -108,7 +117,7 @@ export default function SignupPage() {
         whileTap={{ scale: 0.95 }}
       >
         <ArrowLeft className="w-4 h-4" />
-        <span>Back</span>
+        <span>{t('common:back')}</span>
       </motion.button>
 
       {/* Main Content */}
@@ -122,9 +131,9 @@ export default function SignupPage() {
             transition={{ duration: 0.8 }}
           >
             <div className="bg-white/30 backdrop-blur-sm rounded-2xl p-6 border border-white/40">
-              <h3 className="font-semibold text-gray-700 mb-2">Join Lanezy</h3>
+              <h3 className="font-semibold text-gray-700 mb-2">{t('pages:signup.joinLanezy')}</h3>
               <p className="text-gray-600 text-sm leading-relaxed">
-                Create an account to access the traffic management system.
+                {t('pages:signup.createAccount')}
               </p>
             </div>
           </motion.div>
@@ -137,10 +146,10 @@ export default function SignupPage() {
             transition={{ delay: 0.3, duration: 0.8 }}
           >
             <h2 className="text-2xl font-bold text-center mb-2 bg-gradient-to-r from-gray-700 to-gray-900 bg-clip-text text-transparent">
-              Sign Up
+              {t('pages:signup.title')}
             </h2>
             <p className="text-center text-gray-600 mb-8 text-sm">
-              Fill in your details to get started
+              {t('pages:signup.fillDetails')}
             </p>
 
             <form onSubmit={handleSubmit} className="space-y-5">
@@ -151,7 +160,7 @@ export default function SignupPage() {
                 transition={{ delay: 0.4, duration: 0.6 }}
               >
                 <label className="block text-gray-700 font-semibold mb-2">
-                  Full Name
+                  {t('pages:signup.fullName')}
                 </label>
                 <div className="relative">
                   <User className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
@@ -160,7 +169,7 @@ export default function SignupPage() {
                     name="name"
                     value={form.name}
                     onChange={handleChange}
-                    placeholder="Enter your full name"
+                    placeholder={t('pages:signup.enterFullName')}
                     className="w-full pl-12 pr-4 py-4 bg-white/60 backdrop-blur-sm border border-gray-200/50 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent transition-all duration-300"
                     required
                   />
@@ -174,7 +183,7 @@ export default function SignupPage() {
                 transition={{ delay: 0.5, duration: 0.6 }}
               >
                 <label className="block text-gray-700 font-semibold mb-2">
-                  Email
+                  {t('pages:signup.email')}
                 </label>
                 <div className="relative">
                   <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
@@ -183,7 +192,7 @@ export default function SignupPage() {
                     name="email"
                     value={form.email}
                     onChange={handleChange}
-                    placeholder="Enter your email"
+                    placeholder={t('pages:signup.enterEmail')}
                     className="w-full pl-12 pr-4 py-4 bg-white/60 backdrop-blur-sm border border-gray-200/50 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent transition-all duration-300"
                     required
                   />
@@ -197,7 +206,7 @@ export default function SignupPage() {
                 transition={{ delay: 0.6, duration: 0.6 }}
               >
                 <label className="block text-gray-700 font-semibold mb-2">
-                  Password
+                  {t('pages:signup.password')}
                 </label>
                 <div className="relative">
                   <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
@@ -206,7 +215,7 @@ export default function SignupPage() {
                     name="password"
                     value={form.password}
                     onChange={handleChange}
-                    placeholder="Create a password"
+                    placeholder={t('pages:signup.createPassword')}
                     className="w-full pl-12 pr-4 py-4 bg-white/60 backdrop-blur-sm border border-gray-200/50 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent transition-all duration-300"
                     required
                   />
@@ -220,7 +229,7 @@ export default function SignupPage() {
                 transition={{ delay: 0.7, duration: 0.6 }}
               >
                 <label className="block text-gray-700 font-semibold mb-2">
-                  Role
+                  {t('pages:signup.role')}
                 </label>
                 <div className="relative">
                   <Briefcase className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
@@ -230,9 +239,9 @@ export default function SignupPage() {
                     onChange={handleChange}
                     className="w-full pl-12 pr-4 py-4 bg-white/60 backdrop-blur-sm border border-gray-200/50 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent transition-all duration-300 appearance-none"
                   >
-                    <option value="employee">Traffic Officer</option>
-                    <option value="admin">Admin</option>
-                    <option value="ambulance_driver">Ambulance Driver</option>
+                    <option value="employee">{t('pages:signup.trafficOfficer')}</option>
+                    <option value="admin">{t('pages:signup.admin')}</option>
+                    <option value="ambulance_driver">{t('pages:signup.ambulanceDriver')}</option>
                   </select>
                   <div className="absolute right-4 top-1/2 transform -translate-y-1/2 pointer-events-none">
                     <svg className="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -252,28 +261,28 @@ export default function SignupPage() {
                 >
                   <div>
                     <label className="block text-gray-700 font-semibold mb-2">
-                      Driver License Number
+                      {t('pages:signup.driverLicense')}
                     </label>
                     <input
                       type="text"
                       name="driverLicense"
                       value={form.driverLicense}
                       onChange={handleChange}
-                      placeholder="DL-XXXX-XXXX"
+                      placeholder={t('pages:signup.dlPlaceholder')}
                       className="w-full px-4 py-4 bg-white/60 backdrop-blur-sm border border-gray-200/50 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent transition-all duration-300"
                       required={form.role === 'ambulance_driver'}
                     />
                   </div>
                   <div>
                     <label className="block text-gray-700 font-semibold mb-2">
-                      Vehicle ID
+                      {t('pages:signup.vehicleId')}
                     </label>
                     <input
                       type="text"
                       name="vehicleId"
                       value={form.vehicleId}
                       onChange={handleChange}
-                      placeholder="AMB-XXX"
+                      placeholder={t('pages:signup.ambPlaceholder')}
                       className="w-full px-4 py-4 bg-white/60 backdrop-blur-sm border border-gray-200/50 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent transition-all duration-300"
                       required={form.role === 'ambulance_driver'}
                     />
@@ -300,11 +309,11 @@ export default function SignupPage() {
                 {loading ? (
                   <div className="flex items-center justify-center space-x-2">
                     <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
-                    <span>Creating Account...</span>
+                    <span>{t('pages:signup.creatingAccount')}</span>
                   </div>
                 ) : (
                   <div className="flex items-center justify-center space-x-2">
-                    <span className="text-xl">Create Account</span>
+                    <span className="text-xl">{t('pages:signup.createAccountButton')}</span>
                     <span>→</span>
                   </div>
                 )}
@@ -313,9 +322,9 @@ export default function SignupPage() {
             
             <div className="mt-6 text-center">
               <p className="text-gray-600 text-sm">
-                Already have an account?{' '}
-                <a href="/login" className="text-amber-600 font-semibold hover:text-amber-700">
-                  Login
+                {t('pages:signup.alreadyHaveAccount')}{' '}
+                <a href={window.location.pathname.replace('/signup', '/login')} className="text-amber-600 font-semibold hover:text-amber-700">
+                  {t('pages:signup.login')}
                 </a>
               </p>
             </div>

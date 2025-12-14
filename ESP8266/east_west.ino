@@ -5,7 +5,7 @@
 const char* ssid = "OPPO F25 Pro 5G";
 const char* password = "00000000";
 
-const char* serverName = "http://10.89.28.116:8000/signal_status/INT-001";  
+const char* serverName = "http://10.204.160.116:8000/signal_status/INT-001";  
 
 // EAST LEDs
 const int eastRed = D1;

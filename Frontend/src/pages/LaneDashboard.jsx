@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
+import { useTranslation } from 'react-i18next';
 import LaneCard from '../components/LaneCard';
 import Navbar from '../components/Navbar';
 import { useAuth } from '../services/auth';
@@ -13,6 +14,7 @@ import { useAuth } from '../services/auth';
 // - Non-active lanes clamp to >= 1s to avoid 0s flicker.
 const LaneDashboard = () => {
   const { intersectionId } = useParams();
+  const { t } = useTranslation(['pages', 'components', 'common']);
   const [data, setData] = useState({});
   const [signalStatus, setSignalStatus] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -272,11 +274,11 @@ const LaneDashboard = () => {
           <div className="bg-red-600 text-white px-12 py-6 rounded-3xl shadow-2xl transform animate-bounce border-4 border-white/50">
             <h1 className="text-5xl font-black tracking-wider flex items-center gap-4">
               <span className="text-6xl">🚑</span>
-              EMERGENCY OVERRIDE
+              {t('pages:laneDashboard.emergencyOverride').toUpperCase()}
               <span className="text-6xl">🚨</span>
             </h1>
             <p className="text-center text-xl font-bold mt-2 text-red-100">
-              AMBULANCE APPROACHING - {data.override_direction?.toUpperCase()} LANE GREEN
+              {t('pages:laneDashboard.ambulanceApproaching').toUpperCase()} - {data.override_direction?.toUpperCase()} {t('pages:laneDashboard.laneGreen').toUpperCase()}
             </p>
           </div>
         </div>
@@ -300,9 +302,9 @@ const LaneDashboard = () => {
             <div className="bg-red-600 text-white px-8 py-4 rounded-full shadow-2xl flex items-center gap-4 border-4 border-red-400 animate-pulse">
               <span className="text-3xl">🚑</span>
               <div>
-                <h3 className="text-xl font-bold uppercase tracking-wider">Emergency Override Active</h3>
+                <h3 className="text-xl font-bold uppercase tracking-wider">{t('pages:laneDashboard.overrideActive')}</h3>
                 <p className="text-red-100 font-medium">
-                  Allowing ambulance from <span className="text-white font-bold underline uppercase">{data.override_direction}</span> lane
+                  {t('pages:laneDashboard.allowingAmbulance')} <span className="text-white font-bold underline uppercase">{data.override_direction}</span> {t('pages:laneDashboard.lane')}
                 </p>
               </div>
             </div>
@@ -317,11 +319,11 @@ const LaneDashboard = () => {
           className="mb-8"
         >
           <h1 className="text-5xl md:text-6xl font-bold mb-2 bg-gradient-to-r from-amber-600 via-orange-500 to-yellow-600 bg-clip-text text-transparent font-serif">
-            Traffic Lane Dashboard
+            {t('pages:laneDashboard.title')}
           </h1>
           <div className="w-24 h-1 bg-gradient-to-r from-amber-500 to-orange-500 rounded-full mb-4"></div>
           <p className="text-lg text-gray-700">
-            {intersectionId ? `📍 Intersection: ${intersectionId}` : 'Real-time traffic monitoring'}
+            {intersectionId ? `📍 ${t('pages:laneDashboard.intersection')}: ${intersectionId}` : t('pages:laneDashboard.realTimeMonitoring')}
           </p>
         </motion.div>
 
@@ -335,13 +337,13 @@ const LaneDashboard = () => {
           >
             <h2 className="text-3xl font-bold mb-6 flex items-center gap-3 bg-gradient-to-r from-amber-600 to-orange-600 bg-clip-text text-transparent">
               <span className="text-3xl">📊</span>
-              Signal Status
+              {t('pages:laneDashboard.signalStatus')}
             </h2>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               {[
-                { label: 'Current Lane', value: signalStatus.currentLane || 'None', icon: '🛣' },
+                { label: t('pages:laneDashboard.currentLane'), value: signalStatus.currentLane || t('common:none'), icon: '🛣' },
                 {
-                  label: 'Phase',
+                  label: t('pages:laneDashboard.phase'),
                   value: signalStatus.phase?.toUpperCase() || 'RED',
                   color:
                     signalStatus.phase === 'green'
@@ -351,8 +353,8 @@ const LaneDashboard = () => {
                       : 'text-red-600',
                   icon: signalStatus.phase === 'green' ? '🟢' : signalStatus.phase === 'yellow' ? '🟡' : '🔴',
                 },
-                { label: 'Remaining', value: `${signalStatus.remainingTime || 0}s`, icon: '⏱' },
-                { label: 'Status', value: signalStatus.state ? 'Active' : 'Inactive', icon: '✅' },
+                { label: t('pages:laneDashboard.remaining'), value: `${signalStatus.remainingTime || 0}s`, icon: '⏱' },
+                { label: t('common:status'), value: signalStatus.state ? t('common:active') : t('common:inactive'), icon: '✅' },
               ].map((item, idx) => (
                 <motion.div
                   key={idx}
@@ -380,11 +382,11 @@ const LaneDashboard = () => {
           >
             <h2 className="text-3xl font-bold mb-6 flex items-center gap-3 bg-gradient-to-r from-amber-600 to-orange-600 bg-clip-text text-transparent">
               <span className="text-3xl">⚙</span>
-              Cycle Information
+              {t('pages:laneDashboard.cycleInformation')}
             </h2>
             <div className="space-y-4">
               <div className="bg-gradient-to-r from-white/80 to-orange-50/60 rounded-2xl p-5 border border-white/60">
-                <p className="text-sm text-gray-700 mb-3 font-semibold">Priority Order</p>
+                <p className="text-sm text-gray-700 mb-3 font-semibold">{t('pages:laneDashboard.priorityOrder')}</p>
                 <div className="flex flex-wrap gap-3">
                   {data.priority_order.map((lane, idx) => (
                     <motion.span
@@ -399,7 +401,7 @@ const LaneDashboard = () => {
               </div>
               {data.durations && (
                 <div className="bg-gradient-to-r from-white/80 to-yellow-50/60 rounded-2xl p-5 border border-white/60">
-                  <p className="text-sm text-gray-700 mb-3 font-semibold">Durations</p>
+                  <p className="text-sm text-gray-700 mb-3 font-semibold">{t('pages:laneDashboard.durations')}</p>
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                     {data.priority_order.map((lane) => (
                       <motion.div
@@ -448,7 +450,7 @@ const LaneDashboard = () => {
                     transition={{ duration: 1, repeat: Infinity }}
                     className="text-lg font-semibold text-white/90 mb-2 uppercase tracking-widest drop-shadow-lg"
                   >
-                    {currentPhase === 'green' ? '🟢 Green Light' : '🟡 Yellow Light'}
+                    {currentPhase === 'green' ? `🟢 ${t('pages:laneDashboard.greenLight')}` : `🟡 ${t('pages:laneDashboard.yellowLight')}`}
                   </motion.div>
                   <motion.div
                     key={remainingSeconds}
@@ -459,7 +461,7 @@ const LaneDashboard = () => {
                   >
                     {remainingSeconds}
                   </motion.div>
-                  <div className="text-xl font-semibold text-white/90 mt-4 capitalize drop-shadow-lg">{currentLane} Lane</div>
+                  <div className="text-xl font-semibold text-white/90 mt-4 capitalize drop-shadow-lg">{currentLane} {t('pages:laneDashboard.lane')}</div>
                 </motion.div>
               </div>
             </div>

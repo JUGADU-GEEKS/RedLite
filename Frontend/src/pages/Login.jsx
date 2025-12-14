@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { Shield, Lock, User, ArrowLeft, Mail } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { login } from '../services/auth';
 
 // Floating elements for background decoration
@@ -24,6 +25,7 @@ const FloatingElement = ({ children, delay = 0, duration = 3 }) => (
 
 export default function LoginPage() {
   const navigate = useNavigate();
+  const { t } = useTranslation(['pages', 'common']);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -35,24 +37,35 @@ export default function LoginPage() {
     setLoading(true);
     try {
       const user = await login(email, password);
-      if (user.role === 'admin') navigate('/admin/intersections');
-      else if (user.role === 'ambulance_driver') navigate('/ambulance-dashboard');
-      else if (user.role === 'employee') {
+      // Get current language from URL
+      const path = window.location.pathname;
+      const langMatch = path.match(/^\/(en|hi|od)/);
+      const currentLang = langMatch ? langMatch[1] : 'en';
+      
+      if (user.role === 'admin') {
+        navigate(`/${currentLang}/admin/intersections`, { replace: true });
+      } else if (user.role === 'ambulance_driver') {
+        navigate(`/${currentLang}/ambulance-dashboard`, { replace: true });
+      } else if (user.role === 'employee') {
         const ints = user.assignedIntersections || [];
-        if (ints.length > 0) navigate(`/my-intersections`);
-        else navigate('/dashboard');
+        if (ints.length > 0) {
+          navigate(`/${currentLang}/my-intersections`, { replace: true });
+        } else {
+          navigate(`/${currentLang}/dashboard`, { replace: true });
+        }
       } else {
-        navigate('/home');
+        navigate(`/${currentLang}/home`, { replace: true });
       }
     } catch (err) {
-      setError('Invalid credentials');
+      setError(t('common:invalidCredentials'));
     } finally {
       setLoading(false);
     }
   };
 
   const handleBackClick = () => {
-    navigate('/');
+    const currentLang = window.location.pathname.match(/^\/(en|hi|od)/)?.[1] || 'en';
+    navigate(currentLang === 'en' ? '/' : `/${currentLang}/`);
   };
 
   return (
@@ -86,7 +99,7 @@ export default function LoginPage() {
         whileTap={{ scale: 0.95 }}
       >
         <ArrowLeft className="w-4 h-4" />
-        <span>Back</span>
+        <span>{t('common:back')}</span>
       </motion.button>
 
       {/* Main Content */}
@@ -100,9 +113,9 @@ export default function LoginPage() {
             transition={{ duration: 0.8 }}
           >
             <div className="bg-white/30 backdrop-blur-sm rounded-2xl p-6 border border-white/40">
-              <h3 className="font-semibold text-gray-700 mb-2">Welcome Back</h3>
+              <h3 className="font-semibold text-gray-700 mb-2">{t('pages:login.welcomeBack')}</h3>
               <p className="text-gray-600 text-sm leading-relaxed">
-                Access your Lanezy account to manage traffic systems or report issues.
+                {t('pages:login.accessAccount')}
               </p>
             </div>
           </motion.div>
@@ -115,10 +128,10 @@ export default function LoginPage() {
             transition={{ delay: 0.3, duration: 0.8 }}
           >
             <h2 className="text-2xl font-bold text-center mb-2 bg-gradient-to-r from-gray-700 to-gray-900 bg-clip-text text-transparent">
-              Login
+              {t('pages:login.title')}
             </h2>
             <p className="text-center text-gray-600 mb-8 text-sm">
-              Enter your credentials to continue
+              {t('pages:login.enterCredentials')}
             </p>
 
             <form onSubmit={handleSubmit} className="space-y-6">
@@ -129,7 +142,7 @@ export default function LoginPage() {
                 transition={{ delay: 0.5, duration: 0.6 }}
               >
                 <label className="block text-gray-700 font-semibold mb-2">
-                  Email
+                  {t('pages:login.email')}
                 </label>
                 <div className="relative">
                   <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
@@ -137,7 +150,7 @@ export default function LoginPage() {
                     type="email"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    placeholder="Enter your email"
+                    placeholder={t('pages:login.enterEmail')}
                     className="w-full pl-12 pr-4 py-4 bg-white/60 backdrop-blur-sm border border-gray-200/50 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent transition-all duration-300"
                     required
                   />
@@ -151,7 +164,7 @@ export default function LoginPage() {
                 transition={{ delay: 0.7, duration: 0.6 }}
               >
                 <label className="block text-gray-700 font-semibold mb-2">
-                  Password
+                  {t('pages:login.password')}
                 </label>
                 <div className="relative">
                   <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
@@ -159,7 +172,7 @@ export default function LoginPage() {
                     type="password"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    placeholder="Enter your password"
+                    placeholder={t('pages:login.enterPassword')}
                     className="w-full pl-12 pr-4 py-4 bg-white/60 backdrop-blur-sm border border-gray-200/50 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent transition-all duration-300"
                     required
                   />
@@ -185,11 +198,11 @@ export default function LoginPage() {
                 {loading ? (
                   <div className="flex items-center justify-center space-x-2">
                     <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
-                    <span>Authenticating...</span>
+                    <span>{t('common:authenticating')}</span>
                   </div>
                 ) : (
                   <div className="flex items-center justify-center space-x-2">
-                    <span className="text-xl">Login</span>
+                    <span className="text-xl">{t('pages:login.loginButton')}</span>
                     <span>→</span>
                   </div>
                 )}
@@ -198,9 +211,9 @@ export default function LoginPage() {
             
             <div className="mt-6 text-center">
               <p className="text-gray-600 text-sm">
-                Don't have an account?{' '}
-                <a href="/signup" className="text-amber-600 font-semibold hover:text-amber-700">
-                  Sign up
+                {t('pages:login.dontHaveAccount')}{' '}
+                <a href={window.location.pathname.replace('/login', '/signup')} className="text-amber-600 font-semibold hover:text-amber-700">
+                  {t('pages:login.signUp')}
                 </a>
               </p>
             </div>
