@@ -6,7 +6,7 @@ import { useNavigate } from 'react-router-dom';
 import dhruvImg from '../assets/dhruv_sharma.jpg';
 import kunalImg from '../assets/kunal_sharma.jpg';
 import sangyaImg from '../assets/sangya_ojha.jpg';
-import anam from '../assets/anam.jpg';
+// import anam from '../assets/anam.jpg';
 import sakshi from '../assets/sakshi.jpg';
 import devang from '../assets/devang.jpg';
 import Navbar from "./Navbar";
@@ -156,13 +156,13 @@ const Team = ({ }) => {
       github: "https://github.com/sangya-25",
       image: sangyaImg
     },
-    {
-      name: "Anamitra Bakshi",
-      role: "Frontend Developer",
-      linkedin: "https://www.linkedin.com/in/anamitra-bakshi-b021bb325?utm_source=share&utm_campaign=share_via&utm_content=profile&utm_medium=android_app",
-      github: "https://github.com/anamitra-tech",
-      image: anam
-    },
+    // {
+    //   name: "Anamitra Bakshi",
+    //   role: "Frontend Developer",
+    //   linkedin: "https://www.linkedin.com/in/anamitra-bakshi-b021bb325?utm_source=share&utm_campaign=share_via&utm_content=profile&utm_medium=android_app",
+    //   github: "https://github.com/anamitra-tech",
+    //   image: anam
+    // },
     {
       name: "Sakshi Singh",
       role: "Frontend Developer",
