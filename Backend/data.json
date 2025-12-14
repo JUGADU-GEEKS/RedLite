@@ -1,0 +1,17 @@
+{
+  "locations": [
+    "Connaught Place, Delhi",
+    "Chandni Chowk, Delhi",
+    "Hauz Khas, Delhi"
+  ],
+  "emails": [
+    "dhruvsh5467@gmail.com",
+    "dhruvsh5467@gmail.com",
+    "dhruvsh5467@gmail.com"
+  ],
+  "traffic_light_coordinates": {
+    "lat": 28.612091,
+    "lon": 77.037639,
+    "description": "Default traffic light location - can be updated via API"
+  }
+}

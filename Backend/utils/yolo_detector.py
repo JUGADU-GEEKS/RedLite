@@ -1,0 +1,200 @@
+import cv2
+import base64
+import logging
+import os
+import random
+from typing import Dict, Tuple, List
+
+from ultralytics import YOLO
+from core.config import LANES, MODEL_PATH, VIDEOS_DIR, LANE_VIDEO_MAP
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+class FallbackDetector:
+    def __init__(self):
+        self.mog = cv2.createBackgroundSubtractorMOG2()
+
+    def detect(self, frame):
+        fg_mask = self.mog.apply(frame)
+        _, thresh = cv2.threshold(fg_mask, 200, 255, cv2.THRESH_BINARY)
+        contours, _ = cv2.findContours(thresh, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        
+        count = 0
+        for contour in contours:
+            if cv2.contourArea(contour) > 500:
+                count += 1
+                x, y, w, h = cv2.boundingRect(contour)
+                cv2.rectangle(frame, (x, y), (x + w, y + h), (0, 255, 0), 2)
+        return count, frame
+
+class VideoYOLODetector:
+    def __init__(self, intersection_id: str):
+        self.intersection_id = intersection_id
+        self.video_captures = {}
+        self.model = None
+        self.fallback_detector = FallbackDetector()
+        # cache lane->video mapping per intersection for stable assignments during runtime
+        global _INTERSECTION_VIDEO_MAPS
+        try:
+            _INTERSECTION_VIDEO_MAPS
+        except NameError:
+            _INTERSECTION_VIDEO_MAPS = {}
+
+        logger.info(f"Initializing VideoYOLODetector for intersection {intersection_id}")
+        logger.info(f"VIDEOS_DIR: {VIDEOS_DIR}")
+        logger.info(f"VIDEOS_DIR exists: {os.path.exists(VIDEOS_DIR)}")
+
+        try:
+            if os.path.exists(MODEL_PATH):
+                self.model = YOLO(MODEL_PATH)
+                logger.info(f"YOLO model loaded successfully from {MODEL_PATH}")
+            else:
+                raise FileNotFoundError(f"Model not found at {MODEL_PATH}")
+        except Exception as e:
+            logger.warning(f"YOLO model load failed: {e} — using fallback detector.")
+            self.model = None
+
+        # Determine lane->video mapping for this intersection
+        lane_video_map = self._get_or_create_lane_video_map()
+
+        for lane in LANES:
+            video_file = lane_video_map.get(lane) or LANE_VIDEO_MAP.get(lane)
+            if not video_file:
+                logger.warning(f"No video file mapping for lane '{lane}'")
+                continue
+            
+            video_path = os.path.join(VIDEOS_DIR, video_file)
+            # Normalize path for Windows
+            video_path = os.path.normpath(video_path)
+            logger.debug(f"Checking video path for lane '{lane}': {video_path}")
+            
+            if os.path.exists(video_path):
+                cap = cv2.VideoCapture(video_path)
+                if cap.isOpened():
+                    self.video_captures[lane] = cap
+                    logger.info(f"✓ Video for lane '{lane}' loaded successfully from {video_path}")
+                else:
+                    logger.error(f"✗ Failed to open video for lane '{lane}' at {video_path}")
+            else:
+                logger.error(f"✗ Video for lane '{lane}' not found at {video_path}")
+        
+        logger.info(f"Loaded {len(self.video_captures)}/{len(LANES)} video captures")
+
+    def _list_candidate_videos(self) -> List[str]:
+        try:
+            files = os.listdir(VIDEOS_DIR)
+        except Exception as e:
+            logger.warning(f"Unable to list videos in {VIDEOS_DIR}: {e}")
+            return []
+        banned = {"5.mp4", "wrongside.mp4"}
+        vids = [f for f in files if f.lower().endswith(".mp4") and f not in banned]
+        return vids
+
+    def _get_or_create_lane_video_map(self) -> Dict[str, str]:
+        global _INTERSECTION_VIDEO_MAPS
+        if self.intersection_id in _INTERSECTION_VIDEO_MAPS:
+            return _INTERSECTION_VIDEO_MAPS[self.intersection_id]
+
+        candidates = self._list_candidate_videos()
+        # Ensure deterministic but pseudo-random per intersection if needed
+        rng = random.Random()
+        rng.seed(self.intersection_id)
+        rng.shuffle(candidates)
+
+        # Select up to 4 distinct videos; if fewer, pad using defaults (without banned)
+        selected = candidates[:len(LANES)]
+
+        if len(selected) < len(LANES):
+            # Fill from defaults while avoiding duplicates and banned
+            banned = {"5.mp4", "wrongside.mp4"}
+            defaults = [v for v in [LANE_VIDEO_MAP.get(l) for l in LANES] if v and v not in banned]
+            for v in defaults:
+                if len(selected) >= len(LANES):
+                    break
+                if v not in selected:
+                    selected.append(v)
+
+        # As a last resort, if still fewer than 4, allow repeats to avoid breaking pipeline
+        while len(selected) < len(LANES) and candidates:
+            selected.append(candidates[len(selected) % len(candidates)])
+
+        lane_video_map = {lane: selected[i] for i, lane in enumerate(LANES) if i < len(selected)}
+        _INTERSECTION_VIDEO_MAPS[self.intersection_id] = lane_video_map
+        logger.info(f"[VIDEOS] Assigned for {self.intersection_id}: {lane_video_map}")
+        return lane_video_map
+
+    def _process_frame(self, lane: str, frame):
+        if self.model:
+            results = self.model(frame)
+            count = len(results[0].boxes)
+            annotated_frame = results[0].plot()
+        else:
+            count, annotated_frame = self.fallback_detector.detect(frame)
+        
+        _, buffer = cv2.imencode('.jpg', annotated_frame)
+        frame_b64 = base64.b64encode(buffer).decode('utf-8')
+        return count, frame_b64
+
+    def get_cycle_snapshot(self) -> Tuple[Dict[str, int], Dict[str, str]]:
+        counts = {}
+        frames_b64 = {}
+        
+        # Initialize all lanes to ensure all are present in the result
+        for lane in LANES:
+            counts[lane] = 0
+            frames_b64[lane] = ""
+
+        for lane, cap in self.video_captures.items():
+            if not cap or not cap.isOpened():
+                logger.warning(f"Video capture for lane '{lane}' is not available")
+                continue
+                
+            ret, frame = cap.read()
+            if ret:
+                count, frame_b64 = self._process_frame(lane, frame)
+                counts[lane] = count
+                frames_b64[lane] = frame_b64
+                logger.debug(f"Lane '{lane}': detected {count} vehicles")
+            else:
+                # Reset to beginning if video ended
+                cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
+                ret, frame = cap.read()
+                if ret:
+                    count, frame_b64 = self._process_frame(lane, frame)
+                    counts[lane] = count
+                    frames_b64[lane] = frame_b64
+                    logger.debug(f"Lane '{lane}': detected {count} vehicles (after reset)")
+                else:
+                    logger.warning(f"Failed to read frame for lane '{lane}' even after reset")
+
+        logger.info(f"Cycle snapshot counts: {counts}")
+        return counts, frames_b64
+
+    def read_frame(self, lane: str) -> str:
+        cap = self.video_captures.get(lane)
+        if not cap:
+            logger.debug(f"No video capture for lane '{lane}'")
+            return ""
+
+        ret, frame = cap.read()
+        if not ret:
+            # Reset to beginning if video ended
+            cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
+            ret, frame = cap.read()
+            if not ret:
+                logger.warning(f"Failed to read frame for lane '{lane}'")
+                return ""
+
+        try:
+            count, frame_b64 = self._process_frame(lane, frame)
+            return frame_b64
+        except Exception as e:
+            logger.error(f"Error processing frame for lane '{lane}': {e}")
+            return ""
+
+    def release(self):
+        for cap in self.video_captures.values():
+            cap.release()
+        logger.info("Video captures released.")
+
